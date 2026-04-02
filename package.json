@@ -1,0 +1,37 @@
+{
+    "name": "glade",
+    "displayName": "glade",
+    "description": "Codebase notes.",
+    "version": "1.0.0",
+    "engines": {
+        "vscode": "^1.105.0"
+    },
+    "activationEvents": [],
+    "main": "./out/extension.js",
+    "contributes": {
+        "commands": [
+            {
+                "command": "extension.hello",
+                "title": "Hello world"
+            }
+        ]
+    },
+    "author": "edobrowo",
+    "license": "ISC",
+    "type": "commonjs",
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "lint": "eslint",
+        "watch": "tsc -watch -p ./"
+    },
+    "devDependencies": {
+        "typescript": "^6.0.2",
+        "@types/node": "^25.5.0",
+        "@types/vscode": "^1.110.0",
+        "eslint": "^10.1.0",
+        "typescript-eslint": "^8.58.0",
+        "@eslint/js": "^10.0.1",
+        "@stylistic/eslint-plugin": "^5.10.0"
+    }
+}
