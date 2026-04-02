@@ -14,7 +14,25 @@
                 "command": "extension.hello",
                 "title": "Hello world"
             }
-        ]
+        ],
+        "viewsContainers": {
+            "activitybar": [
+                {
+                    "id": "glade",
+                    "title": "glade",
+                    "icon": "resources/glade.svg"
+                }
+            ]
+        },
+        "views": {
+            "glade": [
+                {
+                    "id": "trackedFiles",
+                    "name": "Tracked Files",
+                    "icon": "resources/glade.svg"
+                }
+            ]
+        }
     },
     "author": "edobrowo",
     "license": "ISC",
@@ -26,12 +44,12 @@
         "watch": "tsc -watch -p ./"
     },
     "devDependencies": {
-        "typescript": "^6.0.2",
+        "@eslint/js": "^10.0.1",
+        "@stylistic/eslint-plugin": "^5.10.0",
         "@types/node": "^25.5.0",
         "@types/vscode": "^1.110.0",
         "eslint": "^10.1.0",
-        "typescript-eslint": "^8.58.0",
-        "@eslint/js": "^10.0.1",
-        "@stylistic/eslint-plugin": "^5.10.0"
+        "typescript": "^6.0.2",
+        "typescript-eslint": "^8.58.0"
     }
 }
