@@ -35,31 +35,66 @@
                 "command": "extension.removeFolder",
                 "title": "Remove Folder",
                 "icon": "$(trash)"
+            },
+            {
+                "command": "extension.trackFileTopLevel",
+                "title": "Track File In Top Level",
+                "icon": "$(new-file)"
+            },
+            {
+                "command": "extension.trackFile",
+                "title": "Track File",
+                "icon": "$(new-file)"
+            },
+            {
+                "command": "extension.untrackFile",
+                "title": "Untrack File",
+                "icon": "$(remove)"
             }
         ],
         "menus": {
             "view/title": [
                 {
+                    "command": "extension.trackFileTopLevel",
+                    "when": "view == gladeFileSystem",
+                    "group": "navigation@1"
+                },
+                {
                     "command": "extension.createTopLevelFolder",
                     "when": "view == gladeFileSystem",
-                    "group": "navigation"
+                    "group": "navigation@2"
                 }
             ],
             "view/item/context": [
                 {
+                    "command": "extension.untrackFile",
+                    "when": "view == gladeFileSystem && viewItem == gladeFile",
+                    "group": "inline"
+                },
+                {
+                    "command": "extension.untrackFile",
+                    "when": "view == gladeFileSystem && viewItem == gladeFile",
+                    "group": "1_manage"
+                },
+                {
+                    "command": "extension.trackFile",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
+                    "group": "inline@1"
+                },
+                {
                     "command": "extension.createFolder",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "inline"
+                    "group": "inline@2"
                 },
                 {
                     "command": "extension.editFolderName",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "inline"
+                    "group": "inline@3"
                 },
                 {
                     "command": "extension.pickFolderColor",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "inline"
+                    "group": "inline@4"
                 },
                 {
                     "command": "extension.editFolderName",
@@ -70,6 +105,11 @@
                     "command": "extension.pickFolderColor",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
                     "group": "0_edit"
+                },
+                {
+                    "command": "extension.trackFile",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
+                    "group": "1_manage"
                 },
                 {
                     "command": "extension.createFolder",
@@ -97,6 +137,14 @@
                 },
                 {
                     "command": "extension.removeFolder",
+                    "when": "false"
+                },
+                {
+                    "command": "extension.trackFileTopLevel",
+                    "when": "true"
+                },
+                {
+                    "command": "extension.trackFile",
                     "when": "false"
                 }
             ]
