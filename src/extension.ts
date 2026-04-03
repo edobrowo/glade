@@ -6,108 +6,131 @@ export function activate(context: vscode.ExtensionContext) {
 
     const provider = new GladeProvider(model);
 
-    const tree_view: vscode.TreeView<GladeTextItem> =
-        vscode.window.createTreeView("gladeView", {
+    const tree_view: vscode.TreeView<GladeFolderItem> =
+        vscode.window.createTreeView("gladeFileSystem", {
             treeDataProvider: provider,
         });
     context.subscriptions.push(tree_view);
 
-    const create_text_item: vscode.Disposable = vscode.commands.registerCommand(
-        "extension.createTextItem",
+    const create_top_level_folder: vscode.Disposable =
+        vscode.commands.registerCommand(
+            "extension.createTopLevelFolder",
+            () => {
+                vscode.window
+                    .showInputBox({
+                        prompt: "Folder Name",
+                        value: "",
+                    })
+                    .then((new_value) => {
+                        if (!new_value) {
+                            return;
+                        }
+                        const parent = provider.model.rootFolder();
+                        provider.model.createFolder(parent, new_value);
+                        provider.refresh();
+                    });
+            },
+        );
+    context.subscriptions.push(create_top_level_folder);
+
+    const create_folder: vscode.Disposable = vscode.commands.registerCommand(
+        "extension.createFolder",
         (item: vscode.TreeItem) => {
-            let text_item: GladeTextItem = item as GladeTextItem;
+            let folder_item: GladeFolderItem = item as GladeFolderItem;
             vscode.window
                 .showInputBox({
-                    prompt: "Name",
+                    prompt: "Folder Name",
                     value: "",
                 })
                 .then((new_value) => {
-                    if (new_value !== undefined) {
-                        provider.model.createEntry(new_value);
+                    if (!new_value) {
+                        return;
                     }
+                    const parent = folder_item.entry_id;
+                    provider.model.createFolder(parent, new_value);
                     provider.refresh();
                 });
         },
     );
-    context.subscriptions.push(create_text_item);
+    context.subscriptions.push(create_folder);
 
-    const remove_text_item: vscode.Disposable = vscode.commands.registerCommand(
-        "extension.removeTextItem",
+    const remove_folder: vscode.Disposable = vscode.commands.registerCommand(
+        "extension.removeFolder",
         (item: vscode.TreeItem) => {
-            let text_item: GladeTextItem = item as GladeTextItem;
-            provider.model.deleteEntry(text_item.entry.id);
+            let folder_item: GladeFolderItem = item as GladeFolderItem;
+            provider.model.remove(folder_item.entry_id);
             provider.refresh();
         },
     );
-    context.subscriptions.push(remove_text_item);
+    context.subscriptions.push(remove_folder);
 
-    const edit_text_item: vscode.Disposable = vscode.commands.registerCommand(
-        "extension.editTextItem",
+    const edit_folder_name: vscode.Disposable = vscode.commands.registerCommand(
+        "extension.editFolderName",
         (item: vscode.TreeItem) => {
-            let text_item: GladeTextItem = item as GladeTextItem;
+            let folder_item: GladeFolderItem = item as GladeFolderItem;
             vscode.window
                 .showInputBox({
                     prompt: "Edit",
-                    value: text_item.labelString(),
+                    value: folder_item.name(),
                 })
                 .then((new_value) => {
                     if (new_value !== undefined) {
-                        provider.model.updateEntryContent(
-                            text_item.entry.id,
-                            new_value,
-                        );
+                        provider.model.setName(folder_item.entry_id, new_value);
+                        provider.refresh();
                     }
-                    provider.refresh();
                 });
         },
     );
-    context.subscriptions.push(edit_text_item);
+    context.subscriptions.push(edit_folder_name);
 }
 
 // TreeView API: https://code.visualstudio.com/api/extension-guides/tree-view
 // Icons: https://microsoft.github.io/vscode-codicons/dist/codicon.html
 
-export class GladeProvider implements vscode.TreeDataProvider<GladeTextItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<GladeItem> =
-        new vscode.EventEmitter<GladeItem>();
+export class GladeProvider implements vscode.TreeDataProvider<GladeFolderItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<GladeFolderItem | null> =
+        new vscode.EventEmitter<GladeFolderItem | null>();
 
-    readonly onDidChangeTreeData: vscode.Event<GladeItem> =
+    readonly onDidChangeTreeData: vscode.Event<GladeFolderItem | null> =
         this._onDidChangeTreeData.event;
 
     constructor(public model: GladeModel) {}
 
     getTreeItem(
-        element: GladeTextItem,
+        element: GladeFolderItem,
     ): vscode.TreeItem | Thenable<vscode.TreeItem> {
         return element;
     }
 
     getChildren(
-        element?: GladeTextItem,
-    ): vscode.ProviderResult<GladeTextItem[]> {
-        if (!element) {
-            return this.model.entries.map((entry) => new GladeTextItem(entry));
-        }
+        element?: GladeFolderItem,
+    ): vscode.ProviderResult<GladeFolderItem[]> {
+        const id = !element ? this.model.rootFolder() : element.entry_id;
+        const children = this.model.folderChildren(id);
+        return children.map(
+            (child) => new GladeFolderItem(child, this.model.name(child)),
+        );
     }
 
     refresh(): void {
-        this._onDidChangeTreeData.fire();
+        this._onDidChangeTreeData.fire(null);
     }
 }
 
 enum GladeItemType {
-    Text = "gladeTextItem",
+    Folder = "gladeFolder",
 }
 
-type GladeItem = GladeTextItem | GladeTextItem[] | undefined | null | void;
-
-class GladeTextItem extends vscode.TreeItem {
-    constructor(public readonly entry: GladeEntry) {
-        super(entry.content, vscode.TreeItemCollapsibleState.None);
-        this.contextValue = GladeItemType.Text;
+class GladeFolderItem extends vscode.TreeItem {
+    constructor(
+        public readonly entry_id: GladeId,
+        name: string,
+    ) {
+        super(name, vscode.TreeItemCollapsibleState.Collapsed);
+        this.contextValue = GladeItemType.Folder;
     }
 
-    labelString(): string {
+    name(): string {
         if (typeof this.label === "string") {
             return this.label;
         }
@@ -123,49 +146,96 @@ function generateGladeId(): GladeId {
     return crypto.randomUUID() as GladeId;
 }
 
-type GladeEntry = {
+type GladeFolderEntry = {
     id: GladeId;
-    content: string;
+    name: string;
+    parent: GladeId;
+    children: GladeId[];
 };
 
 class GladeModel {
     private context: vscode.ExtensionContext;
-    public entries: GladeEntry[];
+    private entries: Record<GladeId, GladeFolderEntry>;
+    private root: GladeFolderEntry;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
-        this.entries = [];
+        this.entries = {};
+
+        const root_id = generateGladeId();
+        this.root = { id: root_id, name: "", parent: root_id, children: [] };
+        this.entries[root_id] = this.root;
     }
 
-    load() {
-        this.entries = this.context.workspaceState.get("glade_entries", []);
+    load(): void {
+        const glade_state = this.context.workspaceState.get<{
+            entries: Record<GladeId, GladeFolderEntry>;
+            tree: GladeFolderEntry;
+        }>("glade_state");
+
+        if (glade_state) {
+            this.entries = glade_state.entries;
+            this.root = glade_state.tree;
+        }
     }
 
-    createEntry(content: string): void {
-        this.entries.push({
-            id: generateGladeId(),
-            content,
-        });
+    rootFolder(): GladeId {
+        return this.root.id;
+    }
+
+    createFolder(parent: GladeId, name: string): void {
+        const id = generateGladeId();
+        this.entries[id] = { id, name, parent: parent, children: [] };
+        this.entries[parent].children.push(id);
         this.save();
     }
 
-    deleteEntry(id: GladeId): void {
-        this.entries = this.entries.filter((entry) => entry.id !== id);
+    name(id: GladeId): string {
+        return this.entries[id].name;
+    }
+
+    setName(id: GladeId, name: string): void {
+        this.entries[id].name = name;
         this.save();
     }
 
-    updateEntryContent(id: GladeId, content: string): void {
-        let entry = this.entries.find((value) => value.id === id);
-        if (entry === undefined) {
+    folderChildren(id: GladeId): GladeId[] {
+        return this.entries[id].children;
+    }
+
+    remove(id: GladeId): void {
+        if (id === this.root.id) return;
+
+        // Check in the event that multiple removes were queued on the same entry.
+        if (!(id in this.entries)) {
             return;
         }
-        entry.content = content;
+
+        this.removeRecursive(id);
+
         this.save();
     }
 
-    private save() {
-        this.context.workspaceState
-            .update("glade_entries", this.entries)
-            .then(() => {});
+    private removeRecursive(id: GladeId): void {
+        let parent = this.parentOf(id);
+        parent.children = parent.children.filter((child) => child !== id);
+
+        for (let child of this.entries[id].children) {
+            this.removeRecursive(child);
+        }
+
+        delete this.entries[id];
+    }
+
+    private parentOf(id: GladeId): GladeFolderEntry {
+        const parent_id = this.entries[id].parent;
+        return this.entries[parent_id];
+    }
+
+    private async save() {
+        await this.context.workspaceState.update("glade_state", {
+            entries: this.entries,
+            tree: this.root,
+        });
     }
 }

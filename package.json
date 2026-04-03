@@ -11,44 +11,62 @@
     "contributes": {
         "commands": [
             {
-                "command": "extension.createTextItem",
-                "title": "Create Text Item",
-                "icon": "$(add)"
+                "command": "extension.createFolder",
+                "title": "Create Folder",
+                "icon": "$(new-folder)"
             },
             {
-                "command": "extension.removeTextItem",
-                "title": "Remove Text Item",
+                "command": "extension.createTopLevelFolder",
+                "title": "Create Folder",
+                "icon": "$(new-folder)"
+            },
+            {
+                "command": "extension.editFolderName",
+                "title": "Edit Folder Name",
+                "icon": "$(rename)"
+            },
+            {
+                "command": "extension.removeFolder",
+                "title": "Remove Folder",
                 "icon": "$(remove)"
-            },
-            {
-                "command": "extension.editTextItem",
-                "title": "Edit Text Item",
-                "icon": "$(edit)"
             }
         ],
         "menus": {
             "view/title": [
                 {
-                    "command": "extension.createTextItem",
-                    "when": "view == gladeView",
+                    "command": "extension.createTopLevelFolder",
+                    "when": "view == gladeFileSystem",
                     "group": "navigation"
                 }
             ],
             "view/item/context": [
                 {
-                    "command": "extension.editTextItem",
-                    "when": "view == gladeView && viewItem == gladeTextItem",
+                    "command": "extension.createFolder",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
                     "group": "inline"
                 },
                 {
-                    "command": "extension.removeTextItem",
-                    "when": "view == gladeView && viewItem == gladeTextItem",
+                    "command": "extension.editFolderName",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
+                    "group": "inline"
+                },
+                {
+                    "command": "extension.removeFolder",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
                     "group": "inline"
                 }
             ],
             "commandPalette": [
                 {
-                    "command": "extension.editTextItem",
+                    "command": "extension.createFolder",
+                    "when": "false"
+                },
+                {
+                    "command": "extension.editFolderName",
+                    "when": "false"
+                },
+                {
+                    "command": "extension.removeFolder",
                     "when": "false"
                 }
             ]
@@ -65,8 +83,8 @@
         "views": {
             "glade": [
                 {
-                    "id": "gladeView",
-                    "name": "My Trees",
+                    "id": "gladeFileSystem",
+                    "name": "The Trees",
                     "icon": "resources/glade.svg"
                 }
             ]
