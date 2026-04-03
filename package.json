@@ -34,7 +34,7 @@
             {
                 "command": "extension.removeFolder",
                 "title": "Remove Folder",
-                "icon": "$(remove)"
+                "icon": "$(trash)"
             }
         ],
         "menus": {
