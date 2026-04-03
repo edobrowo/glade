@@ -99,27 +99,27 @@
                 {
                     "command": "extension.editFolderName",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "0_edit"
+                    "group": "0_edit@1"
                 },
                 {
                     "command": "extension.pickFolderColor",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "0_edit"
+                    "group": "0_edit@2"
                 },
                 {
                     "command": "extension.trackFile",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "1_manage"
+                    "group": "1_manage@1"
                 },
                 {
                     "command": "extension.createFolder",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "1_manage"
+                    "group": "1_manage@2"
                 },
                 {
                     "command": "extension.removeFolder",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "1_manage"
+                    "group": "1_manage@3"
                 }
             ],
             "commandPalette": [

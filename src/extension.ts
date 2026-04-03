@@ -16,55 +16,42 @@ export function activate(context: vscode.ExtensionContext) {
         });
     context.subscriptions.push(tree_view);
 
-    const create_top_level_folder: vscode.Disposable =
-        vscode.commands.registerCommand(
-            "extension.createTopLevelFolder",
-            () => {
-                vscode.window
-                    .showInputBox({
-                        prompt: "Folder Name",
-                        value: "",
-                    })
-                    .then((name) => {
-                        if (!name) {
-                            return;
-                        }
-
-                        const parent = provider.model.rootFolder();
-                        const result = provider.model.createFolder(
-                            parent,
-                            name,
-                        );
-                        if (!result) {
-                            vscode.window.showWarningMessage(
-                                "Folder name already in use.",
-                            );
-                            return;
-                        }
-
-                        provider.refresh();
-                    });
-            },
-        );
-    context.subscriptions.push(create_top_level_folder);
-
-    const create_folder: vscode.Disposable = vscode.commands.registerCommand(
-        "extension.createFolder",
-        (item: vscode.TreeItem) => {
-            let folder_item: GladeFolderItem = item as GladeFolderItem;
+    const create_top_level_folder = vscode.commands.registerCommand(
+        "extension.createTopLevelFolder",
+        () => {
             vscode.window
-                .showInputBox({ prompt: "Folder Name" })
+                .showInputBox({
+                    prompt: "Folder Name",
+                    value: "",
+                })
                 .then((name) => {
-                    if (!name) {
+                    if (!name) return;
+
+                    const parent = provider.model.rootFolder();
+                    const result = provider.model.createFolder(parent, name);
+                    if (!result) {
+                        vscode.window.showWarningMessage("Folder name in use.");
                         return;
                     }
 
-                    const parent = folder_item.entry_id;
+                    provider.refresh();
+                });
+        },
+    );
+    context.subscriptions.push(create_top_level_folder);
+
+    const create_folder = vscode.commands.registerCommand(
+        "extension.createFolder",
+        (item: GladeFolderItem) => {
+            vscode.window
+                .showInputBox({ prompt: "Folder Name" })
+                .then((name) => {
+                    if (!name) return;
+
+                    const parent = item.gladeId;
                     const result = provider.model.createFolder(parent, name);
                     if (!result) {
-                        vscode.window.showWarningMessage(
-                            "Folder name already in use.",
-                        );
+                        vscode.window.showWarningMessage("Folder name in use.");
                         return;
                     }
 
@@ -75,31 +62,26 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(create_folder);
 
-    const remove_folder: vscode.Disposable = vscode.commands.registerCommand(
+    const remove_folder = vscode.commands.registerCommand(
         "extension.removeFolder",
-        (item: vscode.TreeItem) => {
-            let folder_item: GladeFolderItem = item as GladeFolderItem;
-            provider.model.remove(folder_item.entry_id);
+        (item: GladeFolderItem) => {
+            provider.model.remove(item.gladeId);
             provider.refresh();
         },
     );
     context.subscriptions.push(remove_folder);
 
-    const edit_folder_name: vscode.Disposable = vscode.commands.registerCommand(
+    const edit_folder_name = vscode.commands.registerCommand(
         "extension.editFolderName",
-        (item: vscode.TreeItem) => {
-            let folder_item: GladeFolderItem = item as GladeFolderItem;
+        (item: GladeFolderItem) => {
             vscode.window
                 .showInputBox({
                     prompt: "Edit",
-                    value: folder_item.name(),
+                    value: item.name(),
                 })
                 .then((name) => {
                     if (name !== undefined) {
-                        provider.model.setFolderName(
-                            folder_item.entry_id,
-                            name,
-                        );
+                        provider.model.setFolderName(item.gladeId, name);
                         provider.refresh();
                     }
                 });
@@ -107,23 +89,20 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(edit_folder_name);
 
-    const edit_folder_color: vscode.Disposable =
-        vscode.commands.registerCommand(
-            "extension.pickFolderColor",
-            (item: vscode.TreeItem) => {
-                const folder_item: GladeFolderItem = item as GladeFolderItem;
-                openColorPicker(provider, model, folder_item.entry_id);
-            },
-        );
+    const edit_folder_color = vscode.commands.registerCommand(
+        "extension.pickFolderColor",
+        (item: GladeFolderItem) => {
+            openColorPicker(provider, model, item.gladeId);
+        },
+    );
     context.subscriptions.push(edit_folder_color);
 
-    const track_file: vscode.Disposable = vscode.commands.registerCommand(
+    const track_file = vscode.commands.registerCommand(
         "extension.trackFile",
-        (item: vscode.TreeItem) => {
-            const folder_item: GladeFolderItem = item as GladeFolderItem;
+        (item: GladeFolderItem) => {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
-                const id = folder_item.entry_id;
+                const id = item.gladeId;
                 const uri = editor.document.uri;
                 const result = provider.model.createFile(id, uri);
                 if (!result) {
@@ -143,8 +122,9 @@ export function activate(context: vscode.ExtensionContext) {
     );
     context.subscriptions.push(track_file);
 
-    const track_file_top_level: vscode.Disposable =
-        vscode.commands.registerCommand("extension.trackFileTopLevel", () => {
+    const track_file_top_level = vscode.commands.registerCommand(
+        "extension.trackFileTopLevel",
+        () => {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const root = provider.model.rootFolder();
@@ -163,33 +143,32 @@ export function activate(context: vscode.ExtensionContext) {
                     "An editor must be open to track a file.",
                 );
             }
-        });
+        },
+    );
     context.subscriptions.push(track_file_top_level);
 
-    const untrack_file: vscode.Disposable = vscode.commands.registerCommand(
+    const untrack_file = vscode.commands.registerCommand(
         "extension.untrackFile",
-        (item: vscode.TreeItem) => {
-            const file_item: GladeFileItem = item as GladeFileItem;
-            provider.model.remove(file_item.entry_id);
+        (item: GladeFileItem) => {
+            provider.model.remove(item.gladeId);
             provider.refresh();
         },
     );
     context.subscriptions.push(untrack_file);
 
-    const open_file_in_editor: vscode.Disposable =
-        vscode.commands.registerCommand(
-            "extension.openFileInEditor",
-            async (uri: vscode.Uri) => {
-                const doc = await vscode.workspace.openTextDocument(uri);
-                await vscode.window.showTextDocument(doc);
-            },
-        );
+    const open_file_in_editor = vscode.commands.registerCommand(
+        "extension.openFileInEditor",
+        async (uri: vscode.Uri) => {
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc);
+        },
+    );
     context.subscriptions.push(open_file_in_editor);
 }
 
+// TODO: drag-and-drop.
 // TODO: open recursively.
 // TODO: close recursively.
-// TODO: drag-and-drop.
 
 // TreeView API: https://code.visualstudio.com/api/extension-guides/tree-view
 // Icons: https://microsoft.github.io/vscode-codicons/dist/codicon.html
@@ -203,14 +182,14 @@ export class GladeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     constructor(public model: GladeModel) {}
 
-    getTreeItem(element: vscode.TreeItem): vscode.TreeItem {
+    getTreeItem(element: GladeItem): GladeItem {
         return element;
     }
 
     getChildren(
         element?: GladeFolderItem,
     ): vscode.ProviderResult<vscode.TreeItem[]> {
-        const id = !element ? this.model.rootFolder() : element.entry_id;
+        const id = !element ? this.model.rootFolder() : element.gladeId;
         if (this.model.isFolder(id)) {
             const children = this.model.folderChildren(id);
             return children.map((child) => {
@@ -221,7 +200,6 @@ export class GladeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
                         this.model.setFolderIconPath(child),
                     );
                 } else {
-                    // if (this.model.isFile(child))
                     return new GladeFileItem(child, this.model.fileUri(child));
                 }
             });
@@ -240,12 +218,28 @@ enum GladeItemType {
     Folder = "gladeFolder",
 }
 
-class GladeFileItem extends vscode.TreeItem {
+class GladeItem extends vscode.TreeItem {
+    public readonly gladeId: GladeId;
+
     constructor(
-        public readonly entry_id: GladeId,
-        uri: vscode.Uri,
+        glade_id: GladeId,
+        label: string | vscode.Uri,
+        collapsible_state?: vscode.TreeItemCollapsibleState,
     ) {
-        super(uri, vscode.TreeItemCollapsibleState.None);
+        if (label instanceof vscode.Uri) {
+            super(label, vscode.TreeItemCollapsibleState.None);
+        } else {
+            super(label, collapsible_state);
+        }
+
+        this.gladeId = glade_id;
+    }
+}
+
+class GladeFileItem extends GladeItem {
+    constructor(glade_id: GladeId, uri: vscode.Uri) {
+        super(glade_id, uri);
+
         this.contextValue = GladeItemType.File;
 
         this.resourceUri = uri;
@@ -259,13 +253,10 @@ class GladeFileItem extends vscode.TreeItem {
     }
 }
 
-class GladeFolderItem extends vscode.TreeItem {
-    constructor(
-        public readonly entry_id: GladeId,
-        name: string,
-        icon_path: string,
-    ) {
-        super(name, vscode.TreeItemCollapsibleState.Collapsed);
+class GladeFolderItem extends GladeItem {
+    constructor(glade_id: GladeId, name: string, icon_path: string) {
+        super(glade_id, name, vscode.TreeItemCollapsibleState.Collapsed);
+
         this.contextValue = GladeItemType.Folder;
         this.iconPath = icon_path;
     }
