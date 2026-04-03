@@ -18,46 +18,42 @@ export function activate(context: vscode.ExtensionContext) {
 
     const create_top_level_folder = vscode.commands.registerCommand(
         "extension.createTopLevelFolder",
-        () => {
-            vscode.window
-                .showInputBox({
-                    prompt: "Folder Name",
-                    value: "",
-                })
-                .then((name) => {
-                    if (!name) return;
+        async () => {
+            const name = await vscode.window.showInputBox({
+                prompt: "Folder Name",
+                value: "",
+            });
+            if (!name) return;
 
-                    const parent = provider.model.rootFolder();
-                    const result = provider.model.createFolder(parent, name);
-                    if (!result) {
-                        vscode.window.showWarningMessage("Folder name in use.");
-                        return;
-                    }
+            const parent = provider.model.rootFolder();
+            const result = provider.model.createFolder(parent, name);
+            if (!result) {
+                vscode.window.showWarningMessage("Folder name in use.");
+                return;
+            }
 
-                    provider.refresh();
-                });
+            provider.refresh();
         },
     );
     context.subscriptions.push(create_top_level_folder);
 
     const create_folder = vscode.commands.registerCommand(
         "extension.createFolder",
-        (item: GladeFolderItem) => {
-            vscode.window
-                .showInputBox({ prompt: "Folder Name" })
-                .then((name) => {
-                    if (!name) return;
+        async (item: GladeFolderItem) => {
+            const name = await vscode.window.showInputBox({
+                prompt: "Folder Name",
+            });
+            if (!name) return;
 
-                    const parent = item.gladeId;
-                    const result = provider.model.createFolder(parent, name);
-                    if (!result) {
-                        vscode.window.showWarningMessage("Folder name in use.");
-                        return;
-                    }
+            const parent = item.gladeId;
+            const result = provider.model.createFolder(parent, name);
+            if (!result) {
+                vscode.window.showWarningMessage("Folder name in use.");
+                return;
+            }
 
-                    // TODO: expand parent on create.
-                    provider.refresh();
-                });
+            // TODO: expand parent on create.
+            provider.refresh();
         },
     );
     context.subscriptions.push(create_folder);
@@ -73,18 +69,16 @@ export function activate(context: vscode.ExtensionContext) {
 
     const edit_folder_name = vscode.commands.registerCommand(
         "extension.editFolderName",
-        (item: GladeFolderItem) => {
-            vscode.window
-                .showInputBox({
-                    prompt: "Edit",
-                    value: item.name(),
-                })
-                .then((name) => {
-                    if (name !== undefined) {
-                        provider.model.setFolderName(item.gladeId, name);
-                        provider.refresh();
-                    }
-                });
+        async (item: GladeFolderItem) => {
+            const name = await vscode.window.showInputBox({
+                prompt: "Edit",
+                value: item.name(),
+            });
+            if (!name) return;
+
+            provider.model.setFolderName(item.gladeId, name);
+
+            provider.refresh();
         },
     );
     context.subscriptions.push(edit_folder_name);
