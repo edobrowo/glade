@@ -31,7 +31,16 @@ export function activate(context: vscode.ExtensionContext) {
                         }
 
                         const parent = provider.model.rootFolder();
-                        provider.model.createFolder(parent, name);
+                        const result = provider.model.createFolder(
+                            parent,
+                            name,
+                        );
+                        if (!result) {
+                            vscode.window.showWarningMessage(
+                                "Folder name already in use.",
+                            );
+                            return;
+                        }
 
                         provider.refresh();
                     });
@@ -51,7 +60,13 @@ export function activate(context: vscode.ExtensionContext) {
                     }
 
                     const parent = folder_item.entry_id;
-                    provider.model.createFolder(parent, name);
+                    const result = provider.model.createFolder(parent, name);
+                    if (!result) {
+                        vscode.window.showWarningMessage(
+                            "Folder name already in use.",
+                        );
+                        return;
+                    }
 
                     // TODO: expand parent on create.
                     provider.refresh();
@@ -110,7 +125,13 @@ export function activate(context: vscode.ExtensionContext) {
             if (editor) {
                 const id = folder_item.entry_id;
                 const uri = editor.document.uri;
-                provider.model.createFile(id, uri);
+                const result = provider.model.createFile(id, uri);
+                if (!result) {
+                    vscode.window.showWarningMessage(
+                        "File already tracked in folder.",
+                    );
+                    return;
+                }
 
                 provider.refresh();
             } else {
@@ -128,7 +149,13 @@ export function activate(context: vscode.ExtensionContext) {
             if (editor) {
                 const root = provider.model.rootFolder();
                 const uri = editor.document.uri;
-                provider.model.createFile(root, uri);
+                const result = provider.model.createFile(root, uri);
+                if (!result) {
+                    vscode.window.showWarningMessage(
+                        "File already tracked in folder.",
+                    );
+                    return;
+                }
 
                 provider.refresh();
             } else {
@@ -332,7 +359,14 @@ class GladeModel {
                 folder.children = entry.children;
                 this.entries[id] = folder;
             } else {
-                let file = new GladeFile(parent, id, entry.uri);
+                const uri = vscode.Uri.from({
+                    scheme: entry.uri.scheme,
+                    authority: entry.uri.authority,
+                    path: entry.uri.path,
+                    query: entry.uri.query,
+                    fragment: entry.uri.fragment,
+                });
+                let file = new GladeFile(parent, id, uri);
                 this.entries[id] = file;
             }
         }
@@ -347,16 +381,23 @@ class GladeModel {
         return this.entries[id] instanceof GladeFile;
     }
 
-    createFile(folder_id: GladeId, uri: vscode.Uri): void {
-        const id = generateGladeId();
+    createFile(folder_id: GladeId, uri: vscode.Uri): boolean {
+        const uri_in_use = this.files(folder_id).some(
+            (file) => file.uri.toString() === uri.toString(),
+        );
+        if (uri_in_use) {
+            return false;
+        }
 
-        let file = new GladeFile(folder_id, id, uri);
-        this.entries[id] = file;
+        const id = generateGladeId();
+        this.entries[id] = new GladeFile(folder_id, id, uri);
 
         let folder = this.folder(folder_id);
         folder.children.push(id);
 
         this.save();
+
+        return true;
     }
 
     fileUri(id: GladeId): vscode.Uri {
@@ -368,7 +409,14 @@ class GladeModel {
         return this.entries[id] instanceof GladeFolder;
     }
 
-    createFolder(parent: GladeId, name: string): void {
+    createFolder(parent: GladeId, name: string): boolean {
+        const name_in_use = this.subfolders(parent).some(
+            (folder) => folder.name === name,
+        );
+        if (name_in_use) {
+            return false;
+        }
+
         const id = generateGladeId();
 
         let folder = new GladeFolder(parent, id, name);
@@ -378,6 +426,8 @@ class GladeModel {
         parent_folder.children.push(id);
 
         this.save();
+
+        return true;
     }
 
     folderName(id: GladeId): string {
@@ -411,6 +461,20 @@ class GladeModel {
     folderChildren(id: GladeId): GladeId[] {
         const folder = this.folder(id);
         return folder.children;
+    }
+
+    private files(id: GladeId): GladeFile[] {
+        const folder = this.folder(id);
+        return folder.children
+            .filter((id) => this.isFile(id))
+            .map((id) => this.file(id));
+    }
+
+    private subfolders(id: GladeId): GladeFolder[] {
+        const folder = this.folder(id);
+        return folder.children
+            .filter((id) => this.isFolder(id))
+            .map((id) => this.folder(id));
     }
 
     remove(id: GladeId): void {
