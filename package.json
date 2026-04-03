@@ -62,9 +62,24 @@
                     "group": "inline"
                 },
                 {
+                    "command": "extension.editFolderName",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
+                    "group": "0_edit"
+                },
+                {
+                    "command": "extension.pickFolderColor",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
+                    "group": "0_edit"
+                },
+                {
+                    "command": "extension.createFolder",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
+                    "group": "1_manage"
+                },
+                {
                     "command": "extension.removeFolder",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
-                    "group": "inline"
+                    "group": "1_manage"
                 }
             ],
             "commandPalette": [
