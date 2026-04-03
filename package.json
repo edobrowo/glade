@@ -11,10 +11,48 @@
     "contributes": {
         "commands": [
             {
-                "command": "extension.hello",
-                "title": "Hello world"
+                "command": "extension.createTextItem",
+                "title": "Create Text Item",
+                "icon": "$(add)"
+            },
+            {
+                "command": "extension.removeTextItem",
+                "title": "Remove Text Item",
+                "icon": "$(remove)"
+            },
+            {
+                "command": "extension.editTextItem",
+                "title": "Edit Text Item",
+                "icon": "$(edit)"
             }
         ],
+        "menus": {
+            "view/title": [
+                {
+                    "command": "extension.createTextItem",
+                    "when": "view == gladeView",
+                    "group": "navigation"
+                }
+            ],
+            "view/item/context": [
+                {
+                    "command": "extension.editTextItem",
+                    "when": "view == gladeView && viewItem == gladeTextItem",
+                    "group": "inline"
+                },
+                {
+                    "command": "extension.removeTextItem",
+                    "when": "view == gladeView && viewItem == gladeTextItem",
+                    "group": "inline"
+                }
+            ],
+            "commandPalette": [
+                {
+                    "command": "extension.editTextItem",
+                    "when": "false"
+                }
+            ]
+        },
         "viewsContainers": {
             "activitybar": [
                 {
@@ -27,8 +65,8 @@
         "views": {
             "glade": [
                 {
-                    "id": "trackedFiles",
-                    "name": "Tracked Files",
+                    "id": "gladeView",
+                    "name": "My Trees",
                     "icon": "resources/glade.svg"
                 }
             ]
