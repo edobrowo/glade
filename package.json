@@ -1,11 +1,12 @@
 {
     "name": "glade",
     "displayName": "glade",
-    "description": "Codebase notes.",
+    "description": "Glade of file trees.",
     "version": "1.0.0",
     "engines": {
         "vscode": "^1.105.0"
     },
+    "publisher": "edobrowo",
     "activationEvents": [],
     "main": "./out/extension.js",
     "contributes": {
@@ -24,6 +25,11 @@
                 "command": "extension.editFolderName",
                 "title": "Edit Folder Name",
                 "icon": "$(rename)"
+            },
+            {
+                "command": "extension.pickFolderColor",
+                "title": "Pick Folder Color",
+                "icon": "$(symbol-color)"
             },
             {
                 "command": "extension.removeFolder",
@@ -51,6 +57,11 @@
                     "group": "inline"
                 },
                 {
+                    "command": "extension.pickFolderColor",
+                    "when": "view == gladeFileSystem && viewItem == gladeFolder",
+                    "group": "inline"
+                },
+                {
                     "command": "extension.removeFolder",
                     "when": "view == gladeFileSystem && viewItem == gladeFolder",
                     "group": "inline"
@@ -63,6 +74,10 @@
                 },
                 {
                     "command": "extension.editFolderName",
+                    "when": "false"
+                },
+                {
+                    "command": "extension.pickFolderColor",
                     "when": "false"
                 },
                 {
