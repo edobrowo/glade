@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 export function activate(context: vscode.ExtensionContext): void {
-    // context.workspaceState.update("glade_state", undefined);
+    context.workspaceState.update("glade_state", undefined);
 
     let model = Model.load(context);
     if (!model) model = Model.create(context);
@@ -95,10 +95,10 @@ export function activate(context: vscode.ExtensionContext): void {
             provider.refresh();
 
             // TODO: broken.
-            for (const id of folder_descendents.toReversed()) {
-                const folder_item = provider.createFolderItem(id);
-                await tree_view.reveal(folder_item, { expand: false });
-            }
+            // for (const id of folder_descendents.toReversed()) {
+            //     const folder_item = provider.createFolderItem(id);
+            //     await tree_view.reveal(folder_item, { expand: false });
+            // }
         },
     );
     context.subscriptions.push(top_level_collapse_all);
@@ -125,6 +125,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
             provider.refresh();
 
+            // FIXME: Hack to reveal the folder. The collapsible state can be set to None or Collapsed, but not Expanded.
+            // FIXME: Folders do not expand on first workspace load.
             const parent_folder_item =
                 provider.createFolderItem(parent_folder_id);
             await tree_view.reveal(parent_folder_item, { expand: true });
@@ -170,7 +172,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const edit_folder_color = vscode.commands.registerCommand(
         "extension.pickFolderColor",
         (item: FolderTreeItem) => {
-            openColorPicker(provider, item.entryId);
+            openColorPicker(provider, item);
         },
     );
     context.subscriptions.push(edit_folder_color);
@@ -203,6 +205,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
             provider.refresh();
 
+            // FIXME: Hack to reveal the folder. The collapsible state can be set to None or Collapsed, but not Expanded.
+            // FIXME: Folders do not expand on first workspace load.
             const folder_item = provider.createFolderItem(folder_id);
             await tree_view.reveal(folder_item, { expand: true });
         },
@@ -213,6 +217,7 @@ export function activate(context: vscode.ExtensionContext): void {
         "extension.untrackFile",
         (item: FileTreeItem) => {
             provider.model.remove(item.entryId);
+
             provider.refresh();
         },
     );
@@ -258,7 +263,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         }
     }
 
-    getParent(element: FolderTreeItem): vscode.ProviderResult<FolderTreeItem> {
+    getParent(element: TreeItem): vscode.ProviderResult<FolderTreeItem> {
         const parent_id = this.model.parent(element.entryId);
         return parent_id ? this.createFolderItem(parent_id) : null;
     }
@@ -695,7 +700,7 @@ class IconManager {
     }
 }
 
-function openColorPicker(provider: Provider, id: EntryId): void {
+function openColorPicker(provider: Provider, item: FolderTreeItem): void {
     const panel = vscode.window.createWebviewPanel(
         "gladeColorPicker",
         "Pick Folder Color",
@@ -705,7 +710,7 @@ function openColorPicker(provider: Provider, id: EntryId): void {
         },
     );
 
-    const initial_color = provider.model.folderColor(id);
+    const initial_color = provider.model.folderColor(item.entryId);
     panel.webview.html = colorPickerContent(initial_color);
 
     panel.webview.onDidReceiveMessage(async (message) => {
@@ -718,7 +723,8 @@ function openColorPicker(provider: Provider, id: EntryId): void {
                     1.0,
                 );
 
-                provider.model.folderSetColor(id, color);
+                provider.model.folderSetColor(item.entryId, color);
+
                 provider.refresh();
 
                 panel.dispose();
