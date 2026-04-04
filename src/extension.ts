@@ -25,8 +25,8 @@ export function activate(context: vscode.ExtensionContext) {
             });
             if (!name) return;
 
-            const parent = provider.model.rootFolder();
-            const result = provider.model.createFolder(parent, name);
+            const parent_folder_id = provider.model.rootFolder();
+            const result = provider.model.createFolder(parent_folder_id, name);
             if (!result) {
                 vscode.window.showWarningMessage("Folder name in use.");
                 return;
@@ -45,15 +45,18 @@ export function activate(context: vscode.ExtensionContext) {
             });
             if (!name) return;
 
-            const parent = item.gladeId;
-            const result = provider.model.createFolder(parent, name);
+            const parent_folder_id = item.gladeId;
+            const result = provider.model.createFolder(parent_folder_id, name);
             if (!result) {
                 vscode.window.showWarningMessage("Folder name in use.");
                 return;
             }
 
-            // TODO: expand parent on create.
             provider.refresh();
+
+            // TODO: expand parent on create.
+            // const parentItem = provider.createFolderItem(parent);
+            // await tree_view.reveal(parentItem, { expand: true });
         },
     );
     context.subscriptions.push(create_folder);
@@ -188,18 +191,33 @@ export class GladeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
             const children = this.model.folderChildren(id);
             return children.map((child) => {
                 if (this.model.isFolder(child)) {
-                    return new GladeFolderItem(
-                        child,
-                        this.model.folderName(child),
-                        this.model.setFolderIconPath(child),
-                    );
+                    return this.createFolderItem(child);
                 } else {
-                    return new GladeFileItem(child, this.model.fileUri(child));
+                    return this.createFileitem(child);
                 }
             });
         } else if (this.model.isFile(id)) {
             return [];
         }
+    }
+
+    getParent(
+        element: GladeFolderItem,
+    ): vscode.ProviderResult<GladeFolderItem> {
+        const parent_id = this.model.parentId(element.gladeId);
+        return parent_id ? this.createFolderItem(parent_id) : null;
+    }
+
+    createFolderItem(id: GladeId): GladeFolderItem {
+        return new GladeFolderItem(
+            id,
+            this.model.folderName(id),
+            this.model.setFolderIconPath(id),
+        );
+    }
+
+    createFileitem(id: GladeId): GladeFileItem {
+        return new GladeFileItem(id, this.model.fileUri(id));
     }
 
     refresh(): void {
@@ -272,20 +290,20 @@ function generateGladeId(): GladeId {
 }
 
 class GladeEntry {
-    parent: GladeId;
     id: GladeId;
+    parentId: GladeId | null;
 
-    constructor(parent: GladeId, id: GladeId) {
-        this.parent = parent;
+    constructor(id: GladeId, parent_id: GladeId | null) {
         this.id = id;
+        this.parentId = parent_id;
     }
 }
 
 class GladeFile extends GladeEntry {
     uri: vscode.Uri;
 
-    constructor(parent: GladeId, id: GladeId, uri: vscode.Uri) {
-        super(parent, id);
+    constructor(id: GladeId, parent_id: GladeId | null, uri: vscode.Uri) {
+        super(id, parent_id);
         this.uri = uri;
     }
 }
@@ -295,8 +313,8 @@ class GladeFolder extends GladeEntry {
     color: vscode.Color;
     children: GladeId[];
 
-    constructor(parent: GladeId, id: GladeId, name: string) {
-        super(parent, id);
+    constructor(id: GladeId, parent_id: GladeId | null, name: string) {
+        super(id, parent_id);
 
         this.name = name;
         this.color = new vscode.Color(1.0, 1.0, 1.0, 1.0);
@@ -306,22 +324,20 @@ class GladeFolder extends GladeEntry {
 
 class GladeModel {
     private context: vscode.ExtensionContext;
-    private iconManager: FolderIconManager;
+    private iconManager: IconManager;
 
     private entries: Record<GladeId, GladeEntry>;
-    private root: GladeId;
+    private rootId: GladeId;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
-        this.iconManager = new FolderIconManager(
-            context.globalStorageUri.fsPath,
-        );
+        this.iconManager = new IconManager(context.globalStorageUri.fsPath);
 
         this.entries = {};
 
         const root_id = generateGladeId();
-        this.root = root_id;
-        this.entries[root_id] = new GladeFolder(root_id, root_id, "");
+        this.rootId = root_id;
+        this.entries[root_id] = new GladeFolder(root_id, null, "");
     }
 
     load(): void {
@@ -337,29 +353,36 @@ class GladeModel {
         this.entries = {};
         for (const [entry_id, entry] of Object.entries(glade_state.entries)) {
             const id = entry_id as GladeId;
-            const parent = entry.parent as GladeId;
+            const parent_id = entry.parent as GladeId;
             if (entry.children !== undefined) {
-                let folder = new GladeFolder(parent, id, entry.name);
+                let folder = new GladeFolder(id, parent_id, entry.name);
                 folder.color = entry.color;
                 folder.children = entry.children;
                 this.entries[id] = folder;
             } else {
-                const uri = vscode.Uri.from({
-                    scheme: entry.uri.scheme,
-                    authority: entry.uri.authority,
-                    path: entry.uri.path,
-                    query: entry.uri.query,
-                    fragment: entry.uri.fragment,
+                // Recreate the URI because its loaded format differs from the construction format.
+                const uri = entry.uri;
+                const new_uri = vscode.Uri.from({
+                    scheme: uri.scheme,
+                    authority: uri.authority,
+                    path: uri.path,
+                    query: uri.query,
+                    fragment: uri.fragment,
                 });
-                let file = new GladeFile(parent, id, uri);
+                let file = new GladeFile(id, parent_id, new_uri);
                 this.entries[id] = file;
             }
         }
-        this.root = glade_state.root;
+        this.rootId = glade_state.root;
     }
 
     rootFolder(): GladeId {
-        return this.root;
+        return this.rootId;
+    }
+
+    parentId(id: GladeId): GladeId | null {
+        const parent = this.parentFolder(id);
+        return parent ? parent.id : null;
     }
 
     isFile(id: GladeId): boolean {
@@ -367,15 +390,15 @@ class GladeModel {
     }
 
     createFile(folder_id: GladeId, uri: vscode.Uri): boolean {
-        const uri_in_use = this.files(folder_id).some(
+        const is_uri_in_use = this.files(folder_id).some(
             (file) => file.uri.toString() === uri.toString(),
         );
-        if (uri_in_use) {
+        if (is_uri_in_use) {
             return false;
         }
 
         const id = generateGladeId();
-        this.entries[id] = new GladeFile(folder_id, id, uri);
+        this.entries[id] = new GladeFile(id, folder_id, uri);
 
         let folder = this.folder(folder_id);
         folder.children.push(id);
@@ -394,20 +417,20 @@ class GladeModel {
         return this.entries[id] instanceof GladeFolder;
     }
 
-    createFolder(parent: GladeId, name: string): boolean {
-        const name_in_use = this.subfolders(parent).some(
+    createFolder(parent_folder_id: GladeId, name: string): boolean {
+        const is_name_in_use = this.subfolders(parent_folder_id).some(
             (folder) => folder.name === name,
         );
-        if (name_in_use) {
+        if (is_name_in_use) {
             return false;
         }
 
         const id = generateGladeId();
 
-        let folder = new GladeFolder(parent, id, name);
+        let folder = new GladeFolder(id, parent_folder_id, name);
         this.entries[id] = folder;
 
-        let parent_folder = this.folder(parent);
+        let parent_folder = this.folder(parent_folder_id);
         parent_folder.children.push(id);
 
         this.save();
@@ -448,22 +471,8 @@ class GladeModel {
         return folder.children;
     }
 
-    private files(id: GladeId): GladeFile[] {
-        const folder = this.folder(id);
-        return folder.children
-            .filter((id) => this.isFile(id))
-            .map((id) => this.file(id));
-    }
-
-    private subfolders(id: GladeId): GladeFolder[] {
-        const folder = this.folder(id);
-        return folder.children
-            .filter((id) => this.isFolder(id))
-            .map((id) => this.folder(id));
-    }
-
     remove(id: GladeId): void {
-        if (id === this.root) return;
+        if (id === this.rootId) return;
 
         // Check in the event that multiple removes were queued on the same entry.
         if (!(id in this.entries)) {
@@ -476,22 +485,35 @@ class GladeModel {
     }
 
     private removeRecursive(id: GladeId): void {
-        let parent = this.parentOf(id);
-        parent.children = parent.children.filter((child) => child !== id);
+        let parent = this.parentFolder(id);
+        if (parent) {
+            parent.children = parent.children.filter(
+                (child_id) => child_id !== id,
+            );
+        }
 
         if (this.isFolder(id)) {
             let folder = this.folder(id);
-            for (let child of folder.children) {
-                this.removeRecursive(child);
+            for (let child_id of folder.children) {
+                this.removeRecursive(child_id);
             }
         }
 
         delete this.entries[id];
     }
 
-    private parentOf(id: GladeId): GladeFolder {
-        const parent_id = this.entries[id].parent;
-        return this.folder(parent_id);
+    private files(id: GladeId): GladeFile[] {
+        const folder = this.folder(id);
+        return folder.children
+            .filter((child_id) => this.isFile(child_id))
+            .map((child_id) => this.file(child_id));
+    }
+
+    private subfolders(id: GladeId): GladeFolder[] {
+        const folder = this.folder(id);
+        return folder.children
+            .filter((child_id) => this.isFolder(child_id))
+            .map((child_id) => this.folder(child_id));
     }
 
     private file(id: GladeId): GladeFile {
@@ -502,17 +524,22 @@ class GladeModel {
         return this.entries[id] as GladeFolder;
     }
 
+    private parentFolder(id: GladeId): GladeFolder | null {
+        const parent_id = this.entries[id].parentId;
+        return parent_id != null ? this.folder(parent_id) : null;
+    }
+
     private async save() {
         await this.context.workspaceState.update("glade_state", {
             entries: this.entries,
-            root: this.root,
+            root: this.rootId,
         });
     }
 }
 
-// Don't look beyond this point...
+// Nothing to see here...
 
-class FolderIconManager {
+class IconManager {
     private basePath: string;
 
     constructor(base_path: string) {
