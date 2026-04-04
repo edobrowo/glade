@@ -12,12 +12,22 @@
     "contributes": {
         "commands": [
             {
-                "command": "extension.createFolder",
+                "command": "extension.topLevelTrackFile",
+                "title": "Track File In Top Level",
+                "icon": "$(new-file)"
+            },
+            {
+                "command": "extension.topLevelCreateFolder",
                 "title": "Create Folder",
                 "icon": "$(new-folder)"
             },
             {
-                "command": "extension.createTopLevelFolder",
+                "command": "extension.topLevelCollapseAll",
+                "title": "Collapse All",
+                "icon": "$(collapse-all)"
+            },
+            {
+                "command": "extension.createFolder",
                 "title": "Create Folder",
                 "icon": "$(new-folder)"
             },
@@ -37,11 +47,6 @@
                 "icon": "$(trash)"
             },
             {
-                "command": "extension.trackFileTopLevel",
-                "title": "Track File In Top Level",
-                "icon": "$(new-file)"
-            },
-            {
                 "command": "extension.trackFile",
                 "title": "Track File",
                 "icon": "$(new-file)"
@@ -55,14 +60,19 @@
         "menus": {
             "view/title": [
                 {
-                    "command": "extension.trackFileTopLevel",
+                    "command": "extension.topLevelTrackFile",
                     "when": "view == gladeFileSystem",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "extension.createTopLevelFolder",
+                    "command": "extension.topLevelCreateFolder",
                     "when": "view == gladeFileSystem",
                     "group": "navigation@2"
+                },
+                {
+                    "command": "extension.topLevelCollapseAll",
+                    "when": "view == gladeFileSystem",
+                    "group": "navigation@3"
                 }
             ],
             "view/item/context": [
@@ -140,7 +150,7 @@
                     "when": "false"
                 },
                 {
-                    "command": "extension.trackFileTopLevel",
+                    "command": "extension.topLevelTrackFile",
                     "when": "true"
                 },
                 {

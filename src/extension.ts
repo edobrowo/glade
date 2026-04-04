@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 export function activate(context: vscode.ExtensionContext) {
-    // context.workspaceState.update("glade_state", undefined);
+    context.workspaceState.update("glade_state", undefined);
 
     const model = new GladeModel(context);
     model.load();
@@ -18,18 +18,16 @@ export function activate(context: vscode.ExtensionContext) {
 
     tree_view.onDidExpandElement((event) => {
         const element = event.element as GladeFolderItem;
-        model.setFolderCollapsible(element.gladeId, Collapsible.Expanded);
-        provider.refresh();
+        model.setCollapsible(element.gladeId, Collapsible.Expanded);
     });
 
     tree_view.onDidCollapseElement((event) => {
         const element = event.element as GladeFolderItem;
-        model.setFolderCollapsible(element.gladeId, Collapsible.Collapsed);
-        provider.refresh();
+        model.setCollapsible(element.gladeId, Collapsible.Collapsed);
     });
 
-    const track_file_top_level = vscode.commands.registerCommand(
-        "extension.trackFileTopLevel",
+    const top_level_track_file = vscode.commands.registerCommand(
+        "extension.topLevelTrackFile",
         () => {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
@@ -51,10 +49,10 @@ export function activate(context: vscode.ExtensionContext) {
             }
         },
     );
-    context.subscriptions.push(track_file_top_level);
+    context.subscriptions.push(top_level_track_file);
 
-    const create_top_level_folder = vscode.commands.registerCommand(
-        "extension.createTopLevelFolder",
+    const top_level_create_folder = vscode.commands.registerCommand(
+        "extension.topLevelCreateFolder",
         async () => {
             const name = await vscode.window.showInputBox({
                 prompt: "Folder Name",
@@ -72,7 +70,32 @@ export function activate(context: vscode.ExtensionContext) {
             provider.refresh();
         },
     );
-    context.subscriptions.push(create_top_level_folder);
+    context.subscriptions.push(top_level_create_folder);
+
+    const top_level_collapse_all = vscode.commands.registerCommand(
+        "extension.topLevelCollapseAll",
+        async () => {
+            const root_id = provider.model.rootFolder();
+            const descendents = provider.model.folderDescendents(root_id);
+            const folder_descendents = descendents.filter((id) =>
+                provider.model.isFolder(id),
+            );
+            for (const id of folder_descendents) {
+                if (provider.model.collapsible(id) !== Collapsible.Expanded)
+                    continue;
+                provider.model.setCollapsible(id, Collapsible.Collapsed);
+            }
+
+            provider.refresh();
+
+            // TODO: broken.
+            for (const id of folder_descendents.toReversed()) {
+                const folder_item = provider.createFolderItem(id);
+                await tree_view.reveal(folder_item, { expand: false });
+            }
+        },
+    );
+    context.subscriptions.push(top_level_collapse_all);
 
     const create_folder = vscode.commands.registerCommand(
         "extension.createFolder",
@@ -89,7 +112,7 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
-            provider.model.setFolderCollapsible(
+            provider.model.setCollapsible(
                 parent_folder_id,
                 Collapsible.Expanded,
             );
@@ -138,7 +161,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const track_file = vscode.commands.registerCommand(
         "extension.trackFile",
-        (item: GladeFolderItem) => {
+        async (item: GladeFolderItem) => {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
                 const folder_id = item.gladeId;
@@ -151,12 +174,12 @@ export function activate(context: vscode.ExtensionContext) {
                     return;
                 }
 
-                provider.model.setFolderCollapsible(
-                    folder_id,
-                    Collapsible.Expanded,
-                );
+                provider.model.setCollapsible(folder_id, Collapsible.Expanded);
 
                 provider.refresh();
+
+                const folder_item = provider.createFolderItem(folder_id);
+                await tree_view.reveal(folder_item, { expand: true });
             } else {
                 vscode.window.showErrorMessage(
                     "An editor must be open to track a file.",
@@ -185,6 +208,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(open_file_in_editor);
 }
 
+// TODO: refactor GladeModel to be entirely hierarchical instead of arena-based.
 // TODO: drag-and-drop.
 // TODO: open recursively.
 // TODO: close recursively.
@@ -226,7 +250,7 @@ export class GladeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
     getParent(
         element: GladeFolderItem,
     ): vscode.ProviderResult<GladeFolderItem> {
-        const parent_id = this.model.parentId(element.gladeId);
+        const parent_id = this.model.parent(element.gladeId);
         return parent_id ? this.createFolderItem(parent_id) : null;
     }
 
@@ -239,7 +263,7 @@ export class GladeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
             id,
             this.model.folderName(id),
             this.model.folderIconPath(id),
-            this.convertCollapsible(this.model.folderCollapsible(id)),
+            this.convertCollapsible(this.model.collapsible(id)),
         );
     }
 
@@ -430,7 +454,7 @@ class GladeModel {
         return this.rootId;
     }
 
-    parentId(id: GladeId): GladeId | null {
+    parent(id: GladeId): GladeId | null {
         const parent = this.parentFolder(id);
         return parent ? parent.id : null;
     }
@@ -500,7 +524,9 @@ class GladeModel {
     }
 
     folderColor(id: GladeId): vscode.Color {
+        console.log("folderColor, id=", id);
         const folder = this.folder(id);
+        console.log("folderColor, folder=", folder);
         return folder.color;
     }
 
@@ -512,16 +538,17 @@ class GladeModel {
 
     folderIconPath(id: GladeId): string {
         const color = this.folderColor(id);
+        console.log("folderIconPath", color);
         this.iconManager.generate(color);
         return this.iconManager.pathOf(color);
     }
 
-    folderCollapsible(id: GladeId): Collapsible {
+    collapsible(id: GladeId): Collapsible {
         let folder = this.folder(id);
         return folder.collapsible;
     }
 
-    setFolderCollapsible(id: GladeId, collapsible: Collapsible): void {
+    setCollapsible(id: GladeId, collapsible: Collapsible): void {
         let folder = this.folder(id);
         folder.collapsible = collapsible;
         this.save();
@@ -532,6 +559,20 @@ class GladeModel {
         return folder.children;
     }
 
+    folderDescendents(id: GladeId): GladeId[] {
+        const descendents_recursive = (id: GladeId): GladeId[] => {
+            if (this.isFolder(id)) {
+                return this.folderChildren(id).flatMap((child_id) => [
+                    child_id,
+                    ...descendents_recursive(child_id),
+                ]);
+            } else {
+                return [];
+            }
+        };
+        return descendents_recursive(id);
+    }
+
     remove(id: GladeId): void {
         if (id === this.rootId) return;
 
@@ -540,27 +581,27 @@ class GladeModel {
             return;
         }
 
-        this.removeRecursive(id);
+        const remove_recursive = (id: GladeId): void => {
+            let parent = this.parentFolder(id);
+            if (parent) {
+                parent.children = parent.children.filter(
+                    (child_id) => child_id !== id,
+                );
+            }
+
+            if (this.isFolder(id)) {
+                let folder = this.folder(id);
+                for (let child_id of folder.children) {
+                    remove_recursive(child_id);
+                }
+            }
+
+            delete this.entries[id];
+        };
+
+        remove_recursive(id);
 
         this.save();
-    }
-
-    private removeRecursive(id: GladeId): void {
-        let parent = this.parentFolder(id);
-        if (parent) {
-            parent.children = parent.children.filter(
-                (child_id) => child_id !== id,
-            );
-        }
-
-        if (this.isFolder(id)) {
-            let folder = this.folder(id);
-            for (let child_id of folder.children) {
-                this.removeRecursive(child_id);
-            }
-        }
-
-        delete this.entries[id];
     }
 
     private files(id: GladeId): GladeFile[] {
