@@ -16,6 +16,43 @@ export function activate(context: vscode.ExtensionContext) {
         });
     context.subscriptions.push(tree_view);
 
+    tree_view.onDidExpandElement((event) => {
+        const element = event.element as GladeFolderItem;
+        model.setFolderCollapsible(element.gladeId, Collapsible.Expanded);
+        provider.refresh();
+    });
+
+    tree_view.onDidCollapseElement((event) => {
+        const element = event.element as GladeFolderItem;
+        model.setFolderCollapsible(element.gladeId, Collapsible.Collapsed);
+        provider.refresh();
+    });
+
+    const track_file_top_level = vscode.commands.registerCommand(
+        "extension.trackFileTopLevel",
+        () => {
+            const editor = vscode.window.activeTextEditor;
+            if (editor) {
+                const root = provider.model.rootFolder();
+                const uri = editor.document.uri;
+                const result = provider.model.createFile(root, uri);
+                if (!result) {
+                    vscode.window.showWarningMessage(
+                        "File already tracked in folder.",
+                    );
+                    return;
+                }
+
+                provider.refresh();
+            } else {
+                vscode.window.showErrorMessage(
+                    "An editor must be open to track a file.",
+                );
+            }
+        },
+    );
+    context.subscriptions.push(track_file_top_level);
+
     const create_top_level_folder = vscode.commands.registerCommand(
         "extension.createTopLevelFolder",
         async () => {
@@ -52,11 +89,16 @@ export function activate(context: vscode.ExtensionContext) {
                 return;
             }
 
+            provider.model.setFolderCollapsible(
+                parent_folder_id,
+                Collapsible.Expanded,
+            );
+
             provider.refresh();
 
-            // TODO: expand parent on create.
-            // const parentItem = provider.createFolderItem(parent);
-            // await tree_view.reveal(parentItem, { expand: true });
+            const parent_folder_item =
+                provider.createFolderItem(parent_folder_id);
+            await tree_view.reveal(parent_folder_item, { expand: true });
         },
     );
     context.subscriptions.push(create_folder);
@@ -99,15 +141,20 @@ export function activate(context: vscode.ExtensionContext) {
         (item: GladeFolderItem) => {
             const editor = vscode.window.activeTextEditor;
             if (editor) {
-                const id = item.gladeId;
+                const folder_id = item.gladeId;
                 const uri = editor.document.uri;
-                const result = provider.model.createFile(id, uri);
+                const result = provider.model.createFile(folder_id, uri);
                 if (!result) {
                     vscode.window.showWarningMessage(
                         "File already tracked in folder.",
                     );
                     return;
                 }
+
+                provider.model.setFolderCollapsible(
+                    folder_id,
+                    Collapsible.Expanded,
+                );
 
                 provider.refresh();
             } else {
@@ -118,31 +165,6 @@ export function activate(context: vscode.ExtensionContext) {
         },
     );
     context.subscriptions.push(track_file);
-
-    const track_file_top_level = vscode.commands.registerCommand(
-        "extension.trackFileTopLevel",
-        () => {
-            const editor = vscode.window.activeTextEditor;
-            if (editor) {
-                const root = provider.model.rootFolder();
-                const uri = editor.document.uri;
-                const result = provider.model.createFile(root, uri);
-                if (!result) {
-                    vscode.window.showWarningMessage(
-                        "File already tracked in folder.",
-                    );
-                    return;
-                }
-
-                provider.refresh();
-            } else {
-                vscode.window.showErrorMessage(
-                    "An editor must be open to track a file.",
-                );
-            }
-        },
-    );
-    context.subscriptions.push(track_file_top_level);
 
     const untrack_file = vscode.commands.registerCommand(
         "extension.untrackFile",
@@ -208,11 +230,16 @@ export class GladeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         return parent_id ? this.createFolderItem(parent_id) : null;
     }
 
+    refresh(): void {
+        this._onDidChangeTreeData.fire(null);
+    }
+
     createFolderItem(id: GladeId): GladeFolderItem {
         return new GladeFolderItem(
             id,
             this.model.folderName(id),
-            this.model.setFolderIconPath(id),
+            this.model.folderIconPath(id),
+            this.convertCollapsible(this.model.folderCollapsible(id)),
         );
     }
 
@@ -220,8 +247,17 @@ export class GladeProvider implements vscode.TreeDataProvider<vscode.TreeItem> {
         return new GladeFileItem(id, this.model.fileUri(id));
     }
 
-    refresh(): void {
-        this._onDidChangeTreeData.fire(null);
+    private convertCollapsible(
+        collapsible: Collapsible,
+    ): vscode.TreeItemCollapsibleState {
+        switch (collapsible) {
+            case Collapsible.None:
+                return vscode.TreeItemCollapsibleState.None;
+            case Collapsible.Collapsed:
+                return vscode.TreeItemCollapsibleState.Collapsed;
+            case Collapsible.Expanded:
+                return vscode.TreeItemCollapsibleState.Expanded;
+        }
     }
 }
 
@@ -266,8 +302,13 @@ class GladeFileItem extends GladeItem {
 }
 
 class GladeFolderItem extends GladeItem {
-    constructor(glade_id: GladeId, name: string, icon_path: string) {
-        super(glade_id, name, vscode.TreeItemCollapsibleState.Collapsed);
+    constructor(
+        glade_id: GladeId,
+        name: string,
+        icon_path: string,
+        collapsible: vscode.TreeItemCollapsibleState,
+    ) {
+        super(glade_id, name, collapsible);
 
         this.contextValue = GladeItemType.Folder;
         this.iconPath = icon_path;
@@ -308,10 +349,17 @@ class GladeFile extends GladeEntry {
     }
 }
 
+enum Collapsible {
+    None = 0,
+    Collapsed = 1,
+    Expanded = 2,
+}
+
 class GladeFolder extends GladeEntry {
     name: string;
     color: vscode.Color;
     children: GladeId[];
+    collapsible: Collapsible;
 
     constructor(id: GladeId, parent_id: GladeId | null, name: string) {
         super(id, parent_id);
@@ -319,6 +367,7 @@ class GladeFolder extends GladeEntry {
         this.name = name;
         this.color = new vscode.Color(1.0, 1.0, 1.0, 1.0);
         this.children = [];
+        this.collapsible = Collapsible.None;
     }
 }
 
@@ -358,6 +407,7 @@ class GladeModel {
                 let folder = new GladeFolder(id, parent_id, entry.name);
                 folder.color = entry.color;
                 folder.children = entry.children;
+                folder.collapsible = entry.collapsible;
                 this.entries[id] = folder;
             } else {
                 // Recreate the URI because its loaded format differs from the construction format.
@@ -460,10 +510,21 @@ class GladeModel {
         this.save();
     }
 
-    setFolderIconPath(id: GladeId): string {
+    folderIconPath(id: GladeId): string {
         const color = this.folderColor(id);
         this.iconManager.generate(color);
         return this.iconManager.pathOf(color);
+    }
+
+    folderCollapsible(id: GladeId): Collapsible {
+        let folder = this.folder(id);
+        return folder.collapsible;
+    }
+
+    setFolderCollapsible(id: GladeId, collapsible: Collapsible): void {
+        let folder = this.folder(id);
+        folder.collapsible = collapsible;
+        this.save();
     }
 
     folderChildren(id: GladeId): GladeId[] {
