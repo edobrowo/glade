@@ -13,6 +13,7 @@ export function activate(context: vscode.ExtensionContext): void {
     const tree_view: vscode.TreeView<vscode.TreeItem> =
         vscode.window.createTreeView("gladeTrees", {
             treeDataProvider: provider,
+            dragAndDropController: new DnDController(provider),
         });
     context.subscriptions.push(tree_view);
 
@@ -39,17 +40,9 @@ export function activate(context: vscode.ExtensionContext): void {
                 return;
             }
 
-            const root = provider.model.root();
+            const root_id = provider.rootFolder();
             const uri = editor.document.uri;
-            const result = provider.model.fileCreate(root, uri);
-            if (!result) {
-                vscode.window.showWarningMessage(
-                    "File already tracked in folder.",
-                );
-                return;
-            }
-
-            provider.refresh();
+            provider.trackFile(root_id, uri);
         },
     );
     context.subscriptions.push(top_level_track_file);
@@ -63,14 +56,8 @@ export function activate(context: vscode.ExtensionContext): void {
             });
             if (!name) return;
 
-            const parent_folder_id = provider.model.root();
-            const result = provider.model.folderCreate(parent_folder_id, name);
-            if (!result) {
-                vscode.window.showWarningMessage("Folder name in use.");
-                return;
-            }
-
-            provider.refresh();
+            const root_id = provider.rootFolder();
+            provider.createFolder(root_id, name);
         },
     );
     context.subscriptions.push(top_level_create_folder);
@@ -78,27 +65,8 @@ export function activate(context: vscode.ExtensionContext): void {
     const top_level_collapse_all = vscode.commands.registerCommand(
         "extension.topLevelCollapseAll",
         async () => {
-            const root_id = provider.model.root();
-            const descendents = provider.model.descendents(root_id);
-            const folder_descendents = descendents.filter((id) =>
-                provider.model.isFolder(id),
-            );
-            for (const id of folder_descendents) {
-                if (
-                    provider.model.folderCollapsible(id) !==
-                    Collapsible.Expanded
-                )
-                    continue;
-                provider.model.folderSetCollapsible(id, Collapsible.Collapsed);
-            }
-
-            provider.refresh();
-
-            // TODO: broken.
-            // for (const id of folder_descendents.toReversed()) {
-            //     const folder_item = provider.createFolderItem(id);
-            //     await tree_view.reveal(folder_item, { expand: false });
-            // }
+            const root_id = provider.rootFolder();
+            provider.collapseFolders(root_id);
         },
     );
     context.subscriptions.push(top_level_collapse_all);
@@ -112,18 +80,7 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!name) return;
 
             const parent_folder_id = item.entryId;
-            const result = provider.model.folderCreate(parent_folder_id, name);
-            if (!result) {
-                vscode.window.showWarningMessage("Folder name in use.");
-                return;
-            }
-
-            provider.model.folderSetCollapsible(
-                parent_folder_id,
-                Collapsible.Expanded,
-            );
-
-            provider.refresh();
+            provider.createFolder(parent_folder_id, name);
 
             // FIXME: Hack to reveal the folder. The collapsible state can be set to None or Collapsed, but not Expanded.
             // FIXME: Folders do not expand on first workspace load.
@@ -138,17 +95,7 @@ export function activate(context: vscode.ExtensionContext): void {
         "extension.removeFolder",
         async (item: FolderTreeItem) => {
             const folder_id = item.entryId;
-
-            provider.model.remove(folder_id);
-            const is_empty = provider.model.folderIsEmpty(folder_id);
-            if (is_empty) {
-                provider.model.folderSetCollapsible(
-                    folder_id,
-                    Collapsible.None,
-                );
-            }
-
-            provider.refresh();
+            provider.removeEntry(folder_id);
         },
     );
     context.subscriptions.push(remove_folder);
@@ -162,9 +109,7 @@ export function activate(context: vscode.ExtensionContext): void {
             });
             if (!name) return;
 
-            provider.model.folderSetName(item.entryId, name);
-
-            provider.refresh();
+            provider.setFolderName(item.entryId, name);
         },
     );
     context.subscriptions.push(edit_folder_name);
@@ -190,20 +135,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
             const folder_id = item.entryId;
             const uri = editor.document.uri;
-            const result = provider.model.fileCreate(folder_id, uri);
-            if (!result) {
-                vscode.window.showWarningMessage(
-                    "File already tracked in folder.",
-                );
-                return;
-            }
-
-            provider.model.folderSetCollapsible(
-                folder_id,
-                Collapsible.Expanded,
-            );
-
-            provider.refresh();
+            provider.trackFile(folder_id, uri);
 
             // FIXME: Hack to reveal the folder. The collapsible state can be set to None or Collapsed, but not Expanded.
             // FIXME: Folders do not expand on first workspace load.
@@ -215,18 +147,17 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const untrack_file = vscode.commands.registerCommand(
         "extension.untrackFile",
-        (item: FileTreeItem) => {
-            provider.model.remove(item.entryId);
-
-            provider.refresh();
-        },
+        (item: FileTreeItem) => provider.removeEntry(item.entryId),
     );
     context.subscriptions.push(untrack_file);
 }
 
-// TODO: drag-and-drop.
 // TODO: open recursively.
 // TODO: close recursively.
+// TODO: description text indicating ref count ? i.e., N/M
+// TODO: notes.
+// TODO: export JSON.
+// TODO: color should be optional.
 
 // TreeView API: https://code.visualstudio.com/api/extension-guides/tree-view
 export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -235,7 +166,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
     readonly onDidChangeTreeData: vscode.Event<FolderTreeItem | null> =
         this._onDidChangeTreeData.event;
 
-    public model: Model;
+    private model: Model;
 
     constructor(model: Model) {
         this.model = model;
@@ -255,7 +186,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
                 if (this.model.isFolder(child)) {
                     return this.createFolderItem(child);
                 } else {
-                    return this.createFileitem(child);
+                    return this.createFileItem(child);
                 }
             });
         } else if (this.model.isFile(id)) {
@@ -266,6 +197,116 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
     getParent(element: TreeItem): vscode.ProviderResult<FolderTreeItem> {
         const parent_id = this.model.parent(element.entryId);
         return parent_id ? this.createFolderItem(parent_id) : null;
+    }
+
+    rootFolder(): EntryId {
+        return this.model.root();
+    }
+
+    resolveTargetFolder(id: EntryId): EntryId {
+        if (this.model.isFolder(id)) return id;
+        const parent_id = this.model.parent(id);
+        return parent_id || this.model.root();
+    }
+
+    trackFile(folder_id: EntryId, uri: vscode.Uri): void {
+        const result = this.model.fileCreate(folder_id, uri);
+        if (!result) {
+            vscode.window.showWarningMessage("File already tracked in folder.");
+            return;
+        }
+        this.model.folderSetCollapsible(folder_id, Collapsible.Expanded);
+        this.refresh();
+    }
+
+    createFolder(parent_folder_id: EntryId, name: string): void {
+        const result = this.model.folderCreate(parent_folder_id, name);
+        if (!result) {
+            vscode.window.showWarningMessage("Folder name in use.");
+            return;
+        }
+        this.model.folderSetCollapsible(parent_folder_id, Collapsible.Expanded);
+        this.refresh();
+    }
+
+    moveEntry(id: EntryId, target_folder_id: EntryId): void {
+        const old_parent_id = this.model.parent(id);
+
+        const result = this.model.move(id, target_folder_id);
+        if (!result) {
+            vscode.window.showWarningMessage(
+                "Entry already exists in target folder.",
+            );
+            return;
+        }
+
+        if (old_parent_id) {
+            this.model.folderSetCollapsible(
+                target_folder_id,
+                Collapsible.Expanded,
+            );
+
+            const is_empty = this.model.folderIsEmpty(old_parent_id);
+            if (is_empty) {
+                this.model.folderSetCollapsible(
+                    old_parent_id,
+                    Collapsible.None,
+                );
+            }
+        }
+
+        this.refresh();
+    }
+
+    removeEntry(id: EntryId): void {
+        const folder_id = this.model.parent(id);
+
+        this.model.remove(id);
+
+        if (!folder_id) {
+            this.refresh();
+            return;
+        }
+
+        const is_empty = this.model.folderIsEmpty(folder_id);
+        if (is_empty) {
+            this.model.folderSetCollapsible(folder_id, Collapsible.None);
+        }
+        this.refresh();
+    }
+
+    setFolderName(folder_id: EntryId, name: string): void {
+        this.model.folderSetName(folder_id, name);
+        this.refresh();
+    }
+
+    folderColor(folder_id: EntryId): vscode.Color {
+        return this.model.folderColor(folder_id);
+    }
+
+    setFolderColor(folder_id: EntryId, color: vscode.Color): void {
+        this.model.folderSetColor(folder_id, color);
+        this.refresh();
+    }
+
+    collapseFolders(top_folder_id: EntryId): void {
+        const descendents = this.model.descendents(top_folder_id);
+        const folder_descendents = descendents.filter((id) =>
+            this.model.isFolder(id),
+        );
+        for (const id of folder_descendents) {
+            if (this.model.folderCollapsible(id) !== Collapsible.Expanded)
+                continue;
+            this.model.folderSetCollapsible(id, Collapsible.Collapsed);
+        }
+
+        this.refresh();
+
+        // TODO: broken.
+        // for (const id of folder_descendents.toReversed()) {
+        //     const folder_item = this.createFolderItem(id);
+        //     await tree_view.reveal(folder_item, { expand: false });
+        // }
     }
 
     refresh(): void {
@@ -281,7 +322,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         );
     }
 
-    createFileitem(id: EntryId): FileTreeItem {
+    createFileItem(id: EntryId): FileTreeItem {
         return new FileTreeItem(id, this.model.fileUri(id));
     }
 
@@ -295,6 +336,60 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
                 return vscode.TreeItemCollapsibleState.Collapsed;
             case Collapsible.Expanded:
                 return vscode.TreeItemCollapsibleState.Expanded;
+        }
+    }
+}
+
+class DnDController implements vscode.TreeDragAndDropController<TreeItem> {
+    dropMimeTypes: readonly string[] = [
+        "application/vnd.code.tree.glade",
+        "text/uri-list",
+    ];
+
+    dragMimeTypes: readonly string[] = ["application/vnd.code.tree.glade"];
+
+    constructor(private provider: Provider) {}
+
+    async handleDrag(
+        source: readonly TreeItem[],
+        data_transfer: vscode.DataTransfer,
+        token: vscode.CancellationToken,
+    ): Promise<void> {
+        data_transfer.set(
+            "application/vnd.code.tree.glade",
+            new vscode.DataTransferItem(source.map((item) => item.entryId)),
+        );
+    }
+
+    async handleDrop(
+        target: TreeItem | undefined,
+        data_transfer: vscode.DataTransfer,
+        token: vscode.CancellationToken,
+    ): Promise<void> {
+        const target_folder_id = target
+            ? this.provider.resolveTargetFolder(target.entryId)
+            : this.provider.rootFolder();
+
+        const tree_dti = data_transfer.get("application/vnd.code.tree.glade");
+        if (tree_dti) {
+            const id_list = tree_dti.value;
+
+            for (const id of id_list) {
+                this.provider.moveEntry(id, target_folder_id);
+            }
+
+            return;
+        }
+
+        const tab_dti = data_transfer.get("text/uri-list");
+        if (tab_dti) {
+            const uri = vscode.Uri.parse(tab_dti.value);
+            if (!uri) {
+                vscode.window.showWarningMessage("Invalid URI");
+                return;
+            }
+
+            this.provider.trackFile(target_folder_id, uri);
         }
     }
 }
@@ -375,7 +470,7 @@ enum Collapsible {
 
 class Entry {
     readonly id: EntryId;
-    readonly parentId: EntryId | null;
+    parentId: EntryId | null; // TODO: Should be readonly.
 
     constructor(id: EntryId, parent_id: EntryId | null) {
         this.id = id;
@@ -487,6 +582,42 @@ class Model {
         };
 
         return descendents_recursive(id);
+    }
+
+    move(id: EntryId, target_folder_id: EntryId): boolean {
+        const new_parent_folder = this.folderEntry(target_folder_id);
+        if (this.isFile(id)) {
+            const file = this.fileEntry(id);
+            if (
+                this.folderFileEntries(new_parent_folder.id).some(
+                    (entry) => entry.uri.toString() === file.uri.toString(),
+                )
+            ) {
+                return false;
+            }
+        } else if (this.isFolder(id)) {
+            const folder = this.folderEntry(id);
+            if (
+                this.folderSubfolderEntries(new_parent_folder.id).some(
+                    (entry) => entry.name === folder.name,
+                )
+            ) {
+                return false;
+            }
+        }
+
+        const parent_folder = this.folderParentEntry(id);
+        if (parent_folder) {
+            parent_folder.children = parent_folder.children.filter(
+                (child_id) => child_id !== id,
+            );
+        }
+
+        new_parent_folder.children.push(id);
+
+        this.entries[id].parentId = new_parent_folder.id;
+
+        return true;
     }
 
     remove(id: EntryId): void {
@@ -710,7 +841,7 @@ function openColorPicker(provider: Provider, item: FolderTreeItem): void {
         },
     );
 
-    const initial_color = provider.model.folderColor(item.entryId);
+    const initial_color = provider.folderColor(item.entryId);
     panel.webview.html = colorPickerContent(initial_color);
 
     panel.webview.onDidReceiveMessage(async (message) => {
@@ -723,12 +854,9 @@ function openColorPicker(provider: Provider, item: FolderTreeItem): void {
                     1.0,
                 );
 
-                provider.model.folderSetColor(item.entryId, color);
-
-                provider.refresh();
+                provider.setFolderColor(item.entryId, color);
 
                 panel.dispose();
-
                 return;
         }
     });
