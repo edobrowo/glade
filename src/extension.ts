@@ -3,8 +3,6 @@ import path from "node:path";
 import fs from "node:fs";
 
 export function activate(context: vscode.ExtensionContext): void {
-    // context.workspaceState.update("glade_state", undefined);
-
     let model = Model.load(context);
     if (!model) model = Model.create(context);
 
@@ -31,7 +29,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const top_level_track_file = vscode.commands.registerCommand(
         "extension.topLevelTrackFile",
-        () => {
+        async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showErrorMessage(
@@ -42,7 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
             const root_id = provider.rootFolder();
             const uri = editor.document.uri;
-            provider.trackFile(root_id, uri);
+            await provider.trackFile(root_id, uri);
         },
     );
     context.subscriptions.push(top_level_track_file);
@@ -57,7 +55,7 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!name) return;
 
             const root_id = provider.rootFolder();
-            provider.createFolder(root_id, name);
+            await provider.createFolder(root_id, name);
         },
     );
     context.subscriptions.push(top_level_create_folder);
@@ -66,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
         "extension.topLevelCollapseAll",
         async () => {
             const root_id = provider.rootFolder();
-            provider.collapseFolders(root_id);
+            await provider.collapseFolders(root_id);
         },
     );
     context.subscriptions.push(top_level_collapse_all);
@@ -80,13 +78,7 @@ export function activate(context: vscode.ExtensionContext): void {
             if (!name) return;
 
             const parent_folder_id = item.entryId;
-            provider.createFolder(parent_folder_id, name);
-
-            // FIXME: Hack to reveal the folder. The collapsible state can be set to None or Collapsed, but not Expanded.
-            // FIXME: Folders do not expand on first workspace load.
-            const parent_folder_item =
-                provider.createFolderItem(parent_folder_id);
-            await tree_view.reveal(parent_folder_item, { expand: true });
+            await provider.createFolder(parent_folder_id, name);
         },
     );
     context.subscriptions.push(create_folder);
@@ -95,7 +87,7 @@ export function activate(context: vscode.ExtensionContext): void {
         "extension.removeFolder",
         async (item: FolderTreeItem) => {
             const folder_id = item.entryId;
-            provider.removeEntry(folder_id);
+            await provider.removeEntry(folder_id);
         },
     );
     context.subscriptions.push(remove_folder);
@@ -109,7 +101,7 @@ export function activate(context: vscode.ExtensionContext): void {
             });
             if (!name) return;
 
-            provider.setFolderName(item.entryId, name);
+            await provider.setFolderName(item.entryId, name);
         },
     );
     context.subscriptions.push(edit_folder_name);
@@ -135,19 +127,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
             const folder_id = item.entryId;
             const uri = editor.document.uri;
-            provider.trackFile(folder_id, uri);
-
-            // FIXME: Hack to reveal the folder. The collapsible state can be set to None or Collapsed, but not Expanded.
-            // FIXME: Folders do not expand on first workspace load.
-            const folder_item = provider.createFolderItem(folder_id);
-            await tree_view.reveal(folder_item, { expand: true });
+            await provider.trackFile(folder_id, uri);
         },
     );
     context.subscriptions.push(track_file);
 
     const untrack_file = vscode.commands.registerCommand(
         "extension.untrackFile",
-        (item: FileTreeItem) => provider.removeEntry(item.entryId),
+        async (item: FileTreeItem) => await provider.removeEntry(item.entryId),
     );
     context.subscriptions.push(untrack_file);
 }
@@ -207,30 +194,30 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         return parent_id || this.model.root();
     }
 
-    trackFile(folder_id: EntryId, uri: vscode.Uri): void {
-        const result = this.model.fileCreate(folder_id, uri);
+    async trackFile(folder_id: EntryId, uri: vscode.Uri): Promise<void> {
+        const result = await this.model.fileCreate(folder_id, uri);
         if (!result) {
             vscode.window.showWarningMessage("File already tracked in folder.");
             return;
         }
-        this.model.folderSetCollapsible(folder_id, Collapsible.Expanded);
+        await this.model.folderSetCollapsible(folder_id, Collapsible.Expanded);
         this.refresh();
     }
 
-    createFolder(parent_folder_id: EntryId, name: string): void {
-        const result = this.model.folderCreate(parent_folder_id, name);
+    async createFolder(parent_folder_id: EntryId, name: string): Promise<void> {
+        const result = await this.model.folderCreate(parent_folder_id, name);
         if (!result) {
             vscode.window.showWarningMessage("Folder name in use.");
             return;
         }
-        this.model.folderSetCollapsible(parent_folder_id, Collapsible.Expanded);
+        await this.model.folderSetCollapsible(parent_folder_id, Collapsible.Expanded);
         this.refresh();
     }
 
-    moveEntry(id: EntryId, target_folder_id: EntryId): void {
+    async moveEntry(id: EntryId, target_folder_id: EntryId): Promise<void> {
         const old_parent_id = this.model.parent(id);
 
-        const result = this.model.move(id, target_folder_id);
+        const result = await this.model.move(id, target_folder_id);
         if (!result) {
             vscode.window.showWarningMessage(
                 "Entry already exists in target folder.",
@@ -239,14 +226,14 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         }
 
         if (old_parent_id) {
-            this.model.folderSetCollapsible(
+            await this.model.folderSetCollapsible(
                 target_folder_id,
                 Collapsible.Expanded,
             );
 
             const is_empty = this.model.folderIsEmpty(old_parent_id);
             if (is_empty) {
-                this.model.folderSetCollapsible(
+                await this.model.folderSetCollapsible(
                     old_parent_id,
                     Collapsible.None,
                 );
@@ -274,23 +261,23 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         this.refresh();
     }
 
-    setFolderName(folder_id: EntryId, name: string): void {
-        this.model.folderSetName(folder_id, name);
+    async setFolderName(folder_id: EntryId, name: string): Promise<void> {
+        await this.model.folderSetName(folder_id, name);
 
-        this.refresh();
+        await this.refresh();
     }
 
     folderColor(folder_id: EntryId): vscode.Color {
         return this.model.folderColor(folder_id);
     }
 
-    setFolderColor(folder_id: EntryId, color: vscode.Color): void {
-        this.model.folderSetColor(folder_id, color);
+    async setFolderColor(folder_id: EntryId, color: vscode.Color): Promise<void> {
+        await this.model.folderSetColor(folder_id, color);
 
-        this.refresh();
+        await this.refresh();
     }
 
-    collapseFolders(top_folder_id: EntryId): void {
+    async collapseFolders(top_folder_id: EntryId): Promise<void> {
         const descendents = this.model.descendents(top_folder_id);
         const folder_descendents = descendents.filter((id) =>
             this.model.kind(id) == EntryKind.Folder,
@@ -298,7 +285,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         for (const id of folder_descendents) {
             if (this.model.folderCollapsible(id) !== Collapsible.Expanded)
                 continue;
-            this.model.folderSetCollapsible(id, Collapsible.Collapsed);
+            await this.model.folderSetCollapsible(id, Collapsible.Collapsed);
         }
 
         this.refresh();
@@ -390,7 +377,7 @@ class DnDController implements vscode.TreeDragAndDropController<TreeItem> {
                 return;
             }
 
-            this.provider.trackFile(target_folder_id, uri);
+            await this.provider.trackFile(target_folder_id, uri);
         }
     }
 }
@@ -633,7 +620,7 @@ class Model {
         }
     }
 
-    move(id: EntryId, folder_id: EntryId): boolean {
+    async move(id: EntryId, folder_id: EntryId): Promise<boolean> {
         if (!this.isMovableTo(id, folder_id)) return false;
 
         const parent_id = this.parent(id);
@@ -645,10 +632,12 @@ class Model {
         let entry = this.entry(id);
         entry.parentId = new_parent_folder.id;
 
+        await this.save();
+
         return true;
     }
 
-    remove(id: EntryId): void {
+    async remove(id: EntryId): Promise<void> {
         if (id === this.rootId) return;
 
         // Check in case multiple removes were queued on the same entry.
@@ -674,10 +663,10 @@ class Model {
 
         remove_recursive(id);
 
-        this.save();
+        await this.save();
     }
 
-    fileCreate(folder_id: EntryId, uri: vscode.Uri): boolean {
+    async fileCreate(folder_id: EntryId, uri: vscode.Uri): Promise<boolean> {
         if (this.isUriInFolder(uri, folder_id)) return false;
 
         const id = generateGladeId();
@@ -685,7 +674,7 @@ class Model {
         this.entries[id] = new FileEntry(id, folder_id, uri);
         this.pushSubentry(folder_id, id);
 
-        this.save();
+        await this.save();
 
         return true;
     }
@@ -695,7 +684,7 @@ class Model {
         return file.uri;
     }
 
-    folderCreate(parent_folder_id: EntryId, name: string): boolean {
+    async folderCreate(parent_folder_id: EntryId, name: string): Promise<boolean> {
         if (this.isSubfolderNameInFolder(name, parent_folder_id)) return false;
 
         const id = generateGladeId();
@@ -703,7 +692,7 @@ class Model {
         this.entries[id] = new FolderEntry(id, parent_folder_id, name);
         this.pushSubentry(parent_folder_id, id);
 
-        this.save();
+        await this.save();
 
         return true;
     }
@@ -722,10 +711,11 @@ class Model {
         return folder.name;
     }
 
-    folderSetName(id: EntryId, name: string): void {
+    async folderSetName(id: EntryId, name: string): Promise<void> {
         let folder = this.tryFolderEntry(id);
         folder.name = name;
-        this.save();
+
+        await this.save();
     }
 
     folderColor(id: EntryId): vscode.Color {
@@ -733,10 +723,11 @@ class Model {
         return folder.color;
     }
 
-    folderSetColor(id: EntryId, color: vscode.Color): void {
+    async folderSetColor(id: EntryId, color: vscode.Color): Promise<void> {
         let folder = this.tryFolderEntry(id);
         folder.color = color;
-        this.save();
+
+        await this.save();
     }
 
     folderIconPath(id: EntryId): string {
@@ -750,10 +741,11 @@ class Model {
         return folder.collapsible;
     }
 
-    folderSetCollapsible(id: EntryId, collapsible: Collapsible): void {
+    async folderSetCollapsible(id: EntryId, collapsible: Collapsible): Promise<void> {
         let folder = this.tryFolderEntry(id);
         folder.collapsible = collapsible;
-        this.save();
+
+        await this.save();
     }
 
     private entry(id: EntryId): Entry {
