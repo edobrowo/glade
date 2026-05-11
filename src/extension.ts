@@ -15,6 +15,8 @@ export function activate(context: vscode.ExtensionContext): void {
         });
     context.subscriptions.push(tree_view);
 
+    provider.bindView(tree_view);
+
     tree_view.onDidExpandElement((event) => {
         const element = event.element as FolderTreeItem;
         model.folderSetCollapsible(element.entryId, Collapsible.Expanded);
@@ -29,7 +31,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
     const top_level_track_file = vscode.commands.registerCommand(
         "extension.topLevelTrackFile",
-        async () => {
+        async (item: FolderTreeItem) => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showErrorMessage(
@@ -140,8 +142,6 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 // TODO: notes.
-// TODO: open recursively.
-// TODO: close recursively.
 // TODO: better logo.
 
 // TreeView API: https://code.visualstudio.com/api/extension-guides/tree-view
@@ -152,6 +152,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         this._onDidChangeTreeData.event;
 
     private model: Model;
+    private treeView?: vscode.TreeView<vscode.TreeItem>;
 
     constructor(model: Model) {
         this.model = model;
@@ -159,6 +160,10 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     getTreeItem(element: TreeItem): TreeItem {
         return element;
+    }
+
+    bindView(tree_view: vscode.TreeView<vscode.TreeItem>): void {
+        this.treeView = tree_view;
     }
 
     getChildren(
@@ -181,7 +186,14 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     getParent(element: TreeItem): vscode.ProviderResult<FolderTreeItem> {
         const parent_id = this.model.parent(element.entryId);
-        return parent_id ? this.createFolderItem(parent_id) : null;
+
+        // The root is not an element, so all top-level elements must return
+        // as null.
+        if (!parent_id || parent_id === this.model.root()) {
+            return null;
+        }
+
+        return this.createFolderItem(parent_id);
     }
 
     rootFolder(): EntryId {
@@ -195,13 +207,17 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
     }
 
     async trackFile(folder_id: EntryId, uri: vscode.Uri): Promise<void> {
+        console.log("trackFile", folder_id);
         const result = await this.model.fileCreate(folder_id, uri);
         if (!result) {
             vscode.window.showWarningMessage("File already tracked in folder.");
             return;
         }
         await this.model.folderSetCollapsible(folder_id, Collapsible.Expanded);
+
         this.refresh();
+
+        this.expandFolder(folder_id);
     }
 
     async createFolder(parent_folder_id: EntryId, name: string): Promise<void> {
@@ -211,7 +227,10 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
             return;
         }
         await this.model.folderSetCollapsible(parent_folder_id, Collapsible.Expanded);
+
         this.refresh();
+
+        this.expandFolder(parent_folder_id);
     }
 
     async moveEntry(id: EntryId, target_folder_id: EntryId): Promise<void> {
@@ -241,6 +260,8 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         }
 
         this.refresh();
+
+        this.expandFolder(target_folder_id);
     }
 
     removeEntry(id: EntryId): void {
@@ -279,22 +300,18 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     async collapseFolders(top_folder_id: EntryId): Promise<void> {
         const descendents = this.model.descendents(top_folder_id);
-        const folder_descendents = descendents.filter((id) =>
-            this.model.kind(id) == EntryKind.Folder,
+
+        const folders_to_collapse = [top_folder_id, ...descendents].filter(
+            (id) => this.model.kind(id) == EntryKind.Folder
         );
-        for (const id of folder_descendents) {
+
+        for (const id of folders_to_collapse) {
             if (this.model.folderCollapsible(id) !== Collapsible.Expanded)
                 continue;
             await this.model.folderSetCollapsible(id, Collapsible.Collapsed);
         }
 
         this.refresh();
-
-        // TODO: broken.
-        // for (const id of folder_descendents.toReversed()) {
-        //     const folder_item = this.createFolderItem(id);
-        //     await tree_view.reveal(folder_item, { expand: false });
-        // }
     }
 
     refresh(): void {
@@ -312,6 +329,21 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     createFileItem(id: EntryId): FileTreeItem {
         return new FileTreeItem(id, this.model.fileUri(id));
+    }
+
+    private async expandFolder(folder_id: EntryId): Promise<void> {
+        if (!this.treeView) return;
+
+        const folder_item = this.createFolderItem(folder_id);
+        try {
+            await this.treeView.reveal(folder_item, { 
+                expand: true, 
+                select: false, 
+                focus: false 
+            });
+        } catch (error) {
+            console.error("Failed to expand folder in TreeView", error);
+        }
     }
 
     private convertCollapsible(
@@ -402,6 +434,11 @@ class TreeItem extends vscode.TreeItem {
         }
 
         this.entryId = entry_id;
+
+        // Cache-busting shenanigans.
+        this.id = collapsible_state !== undefined 
+            ? `${entry_id}-${collapsible_state}` 
+            : (entry_id as string);
     }
 }
 
