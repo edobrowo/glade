@@ -3,7 +3,7 @@ import path from "node:path";
 import fs from "node:fs";
 
 export function activate(context: vscode.ExtensionContext): void {
-    context.workspaceState.update("glade_state", undefined);
+    // context.workspaceState.update("glade_state", undefined);
 
     let model = Model.load(context);
     if (!model) model = Model.create(context);
@@ -152,12 +152,10 @@ export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(untrack_file);
 }
 
+// TODO: notes.
 // TODO: open recursively.
 // TODO: close recursively.
-// TODO: description text indicating ref count ? i.e., N/M
-// TODO: notes.
-// TODO: export JSON.
-// TODO: color should be optional.
+// TODO: better logo.
 
 // TreeView API: https://code.visualstudio.com/api/extension-guides/tree-view
 export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
@@ -180,16 +178,16 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         element?: FolderTreeItem,
     ): vscode.ProviderResult<vscode.TreeItem[]> {
         const id = !element ? this.model.root() : element.entryId;
-        if (this.model.isFolder(id)) {
+        if (this.model.kind(id) == EntryKind.Folder) {
             const children = this.model.folderChildren(id);
             return children.map((child) => {
-                if (this.model.isFolder(child)) {
+                if (this.model.kind(child) == EntryKind.Folder) {
                     return this.createFolderItem(child);
                 } else {
                     return this.createFileItem(child);
                 }
             });
-        } else if (this.model.isFile(id)) {
+        } else if (this.model.kind(id) == EntryKind.File) {
             return [];
         }
     }
@@ -204,7 +202,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
     }
 
     resolveTargetFolder(id: EntryId): EntryId {
-        if (this.model.isFolder(id)) return id;
+        if (this.model.kind(id) == EntryKind.Folder) return id;
         const parent_id = this.model.parent(id);
         return parent_id || this.model.root();
     }
@@ -272,11 +270,13 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         if (is_empty) {
             this.model.folderSetCollapsible(folder_id, Collapsible.None);
         }
+
         this.refresh();
     }
 
     setFolderName(folder_id: EntryId, name: string): void {
         this.model.folderSetName(folder_id, name);
+
         this.refresh();
     }
 
@@ -286,13 +286,14 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     setFolderColor(folder_id: EntryId, color: vscode.Color): void {
         this.model.folderSetColor(folder_id, color);
+
         this.refresh();
     }
 
     collapseFolders(top_folder_id: EntryId): void {
         const descendents = this.model.descendents(top_folder_id);
         const folder_descendents = descendents.filter((id) =>
-            this.model.isFolder(id),
+            this.model.kind(id) == EntryKind.Folder,
         );
         for (const id of folder_descendents) {
             if (this.model.folderCollapsible(id) !== Collapsible.Expanded)
@@ -463,31 +464,46 @@ function generateGladeId(): EntryId {
 }
 
 enum Collapsible {
-    None = 0,
-    Collapsed = 1,
-    Expanded = 2,
+    None = "none",
+    Collapsed = "collapsed",
+    Expanded = "expanded",
 }
 
-class Entry {
-    readonly id: EntryId;
-    parentId: EntryId | null; // TODO: Should be readonly.
+enum EntryKind {
+    File = "file",
+    Folder = "folder",
+}
 
-    constructor(id: EntryId, parent_id: EntryId | null) {
+class BaseEntry {
+    readonly kind: EntryKind;
+    readonly id: EntryId;
+    parentId: EntryId | null;
+
+    constructor(kind: EntryKind, id: EntryId, parent_id: EntryId | null) {
+        this.kind = kind;
         this.id = id;
         this.parentId = parent_id;
     }
 }
 
-class File extends Entry {
+class FileEntry extends BaseEntry {
     readonly uri: vscode.Uri;
 
     constructor(id: EntryId, parent_id: EntryId, uri: vscode.Uri) {
-        super(id, parent_id);
-        this.uri = uri;
+        super(EntryKind.File, id, parent_id);
+
+        // Reset the URI since its format can change after deserialization.
+        this.uri = vscode.Uri.from({
+            scheme: uri.scheme,
+            authority: uri.authority,
+            path: uri.path,
+            query: uri.query,
+            fragment: uri.fragment,
+        });
     }
 }
 
-class Folder extends Entry {
+class FolderEntry extends BaseEntry {
     children: EntryId[] = [];
 
     name: string;
@@ -495,10 +511,14 @@ class Folder extends Entry {
     collapsible: Collapsible = Collapsible.None;
 
     constructor(id: EntryId, parent_id: EntryId | null, name: string) {
-        super(id, parent_id);
+        super(EntryKind.Folder, id, parent_id);
         this.name = name;
     }
 }
+
+type Entry =
+    | FileEntry
+    | FolderEntry
 
 class Model {
     private context: vscode.ExtensionContext;
@@ -518,26 +538,27 @@ class Model {
 
         for (const [entry_id, entry] of Object.entries(glade_state.entries)) {
             const id = entry_id as EntryId;
-            const parent_id = entry.parent as EntryId;
+            const parent_id = entry.parentId as EntryId;
+            const kind = entry.kind;
 
-            if (entry.children !== undefined) {
-                let folder = new Folder(id, parent_id, entry.name);
-                folder.color = entry.color;
-                folder.children = entry.children;
-                folder.collapsible = entry.collapsible;
+            switch (kind) {
+                case EntryKind.File: {
+                    const file = new FileEntry(id, parent_id, entry.uri);
 
-                model.entries[id] = folder;
-            } else {
-                // Recreate the URI because its loaded format differs from the construction format.
-                const uri = vscode.Uri.from({
-                    scheme: entry.uri.scheme,
-                    authority: entry.uri.authority,
-                    path: entry.uri.path,
-                    query: entry.uri.query,
-                    fragment: entry.uri.fragment,
-                });
+                    model.entries[id] = file;
 
-                model.entries[id] = new File(id, parent_id, uri);
+                    break;
+                }
+                case EntryKind.Folder: {
+                    const folder = new FolderEntry(id, parent_id, entry.name);
+                    folder.children = entry.children;
+                    folder.color = entry.color;
+                    folder.collapsible = entry.collapsible;
+
+                    model.entries[id] = folder;
+
+                    break;
+                }
             }
         }
 
@@ -556,66 +577,73 @@ class Model {
         this.entries = {};
         this.rootId = root_id;
 
-        this.entries[this.rootId] = new Folder(this.rootId, null, "");
+        this.entries[this.rootId] = new FolderEntry(this.rootId, null, "");
     }
 
     root(): EntryId {
         return this.rootId;
     }
 
+    kind(id: EntryId): EntryKind {
+        return this.entry(id).kind;
+    }
+
     parent(id: EntryId): EntryId | null {
-        return this.entries[id].parentId;
+        return this.entry(id).parentId;
     }
 
     descendents(id: EntryId): EntryId[] {
-        if (this.isFile(id)) return [];
-
         const descendents_recursive = (id: EntryId): EntryId[] => {
-            if (this.isFolder(id)) {
-                return this.folderChildren(id).flatMap((child_id) => [
-                    child_id,
-                    ...descendents_recursive(child_id),
-                ]);
-            } else {
-                return [];
+            switch (this.kind(id)) {
+                case EntryKind.File: {
+                    return [];
+                }
+                case EntryKind.Folder: {
+                    return this.folderChildren(id).flatMap((child_id) => [
+                        child_id,
+                        ...descendents_recursive(child_id),
+                    ]);
+                }
             }
         };
 
         return descendents_recursive(id);
     }
 
-    move(id: EntryId, target_folder_id: EntryId): boolean {
-        const new_parent_folder = this.folderEntry(target_folder_id);
-        if (this.isFile(id)) {
-            const file = this.fileEntry(id);
-            if (
-                this.folderFileEntries(new_parent_folder.id).some(
-                    (entry) => entry.uri.toString() === file.uri.toString(),
-                )
-            ) {
-                return false;
+    isUriInFolder(uri: vscode.Uri, folder_id: EntryId): boolean {
+        return this.folderFileEntries(folder_id).some(
+            (entry) => entry.uri.toString() === uri.toString(),
+        );
+    }
+
+    isSubfolderNameInFolder(name: string, folder_id: EntryId): boolean {
+        return this.folderSubfolderEntries(folder_id).some(
+            (entry) => entry.name === name,
+        );
+    }
+
+    isMovableTo(id: EntryId, folder_id: EntryId): boolean {
+        switch (this.kind(id)) {
+            case EntryKind.File: {
+                return !this.isUriInFolder(this.fileUri(id), folder_id);
             }
-        } else if (this.isFolder(id)) {
-            const folder = this.folderEntry(id);
-            if (
-                this.folderSubfolderEntries(new_parent_folder.id).some(
-                    (entry) => entry.name === folder.name,
-                )
-            ) {
-                return false;
+            case EntryKind.Folder: {
+                return !this.isSubfolderNameInFolder(this.folderName(id), folder_id);
             }
         }
+    }
 
-        const parent_folder = this.folderParentEntry(id);
-        if (parent_folder) {
-            parent_folder.children = parent_folder.children.filter(
-                (child_id) => child_id !== id,
-            );
-        }
+    move(id: EntryId, folder_id: EntryId): boolean {
+        if (!this.isMovableTo(id, folder_id)) return false;
 
+        const parent_id = this.parent(id);
+        if (parent_id) this.removeSubentry(parent_id, id);
+
+        const new_parent_folder = this.tryFolderEntry(folder_id);
         new_parent_folder.children.push(id);
 
-        this.entries[id].parentId = new_parent_folder.id;
+        let entry = this.entry(id);
+        entry.parentId = new_parent_folder.id;
 
         return true;
     }
@@ -627,17 +655,17 @@ class Model {
         if (!(id in this.entries)) return;
 
         const remove_recursive = (id: EntryId): void => {
-            let parent_folder = this.folderParentEntry(id);
-            if (parent_folder) {
-                parent_folder.children = parent_folder.children.filter(
-                    (child_id) => child_id !== id,
-                );
-            }
+            const parent_id = this.parent(id);
+            if (parent_id) this.removeSubentry(parent_id, id);
 
-            if (this.isFolder(id)) {
-                let folder = this.folderEntry(id);
-                for (let child_id of folder.children) {
-                    remove_recursive(child_id);
+            switch (this.kind(id)) {
+                case EntryKind.File: break;
+                case EntryKind.Folder: {
+                    for (let child_id of this.folderChildren(id)) {
+                        remove_recursive(child_id);
+                    }
+
+                    break;
                 }
             }
 
@@ -649,25 +677,13 @@ class Model {
         this.save();
     }
 
-    isFile(id: EntryId): boolean {
-        return this.entries[id] instanceof File;
-    }
-
-    isFolder(id: EntryId): boolean {
-        return this.entries[id] instanceof Folder;
-    }
-
     fileCreate(folder_id: EntryId, uri: vscode.Uri): boolean {
-        const is_uri_in_use = this.folderFileEntries(folder_id).some(
-            (file) => file.uri.toString() === uri.toString(),
-        );
-        if (is_uri_in_use) return false;
+        if (this.isUriInFolder(uri, folder_id)) return false;
 
         const id = generateGladeId();
-        this.entries[id] = new File(id, folder_id, uri);
 
-        let folder = this.folderEntry(folder_id);
-        folder.children.push(id);
+        this.entries[id] = new FileEntry(id, folder_id, uri);
+        this.pushSubentry(folder_id, id);
 
         this.save();
 
@@ -675,31 +691,25 @@ class Model {
     }
 
     fileUri(id: EntryId): vscode.Uri {
-        const file = this.fileEntry(id);
+        const file = this.tryFileEntry(id);
         return file.uri;
     }
 
     folderCreate(parent_folder_id: EntryId, name: string): boolean {
-        const is_name_in_use = this.folderSubfolderEntries(
-            parent_folder_id,
-        ).some((folder) => folder.name === name);
-        if (is_name_in_use) return false;
+        if (this.isSubfolderNameInFolder(name, parent_folder_id)) return false;
 
         const id = generateGladeId();
 
-        let folder = new Folder(id, parent_folder_id, name);
-        this.entries[id] = folder;
-
-        let parent_folder = this.folderEntry(parent_folder_id);
-        parent_folder.children.push(id);
+        this.entries[id] = new FolderEntry(id, parent_folder_id, name);
+        this.pushSubentry(parent_folder_id, id);
 
         this.save();
 
         return true;
     }
 
-    folderChildren(id: EntryId): EntryId[] {
-        const folder = this.folderEntry(id);
+    folderChildren(id: EntryId): readonly EntryId[] {
+        const folder = this.tryFolderEntry(id);
         return folder.children;
     }
 
@@ -708,23 +718,23 @@ class Model {
     }
 
     folderName(id: EntryId): string {
-        const folder = this.folderEntry(id);
+        const folder = this.tryFolderEntry(id);
         return folder.name;
     }
 
     folderSetName(id: EntryId, name: string): void {
-        let folder = this.folderEntry(id);
+        let folder = this.tryFolderEntry(id);
         folder.name = name;
         this.save();
     }
 
     folderColor(id: EntryId): vscode.Color {
-        const folder = this.folderEntry(id);
+        const folder = this.tryFolderEntry(id);
         return folder.color;
     }
 
     folderSetColor(id: EntryId, color: vscode.Color): void {
-        let folder = this.folderEntry(id);
+        let folder = this.tryFolderEntry(id);
         folder.color = color;
         this.save();
     }
@@ -736,41 +746,62 @@ class Model {
     }
 
     folderCollapsible(id: EntryId): Collapsible {
-        let folder = this.folderEntry(id);
+        let folder = this.tryFolderEntry(id);
         return folder.collapsible;
     }
 
     folderSetCollapsible(id: EntryId, collapsible: Collapsible): void {
-        let folder = this.folderEntry(id);
+        let folder = this.tryFolderEntry(id);
         folder.collapsible = collapsible;
         this.save();
     }
 
-    private fileEntry(id: EntryId): File {
-        return this.entries[id] as File;
+    private entry(id: EntryId): Entry {
+        return this.entries[id];
     }
 
-    private folderEntry(id: EntryId): Folder {
-        return this.entries[id] as Folder;
+    private tryFileEntry(id: EntryId): FileEntry {
+        if (this.kind(id) !== EntryKind.File) {
+            throw new Error("Entry is not a folder");
+        }
+        return this.entry(id) as FileEntry;
     }
 
-    private folderFileEntries(id: EntryId): File[] {
-        const folder = this.folderEntry(id);
+    private tryFolderEntry(id: EntryId): FolderEntry {
+        if (this.kind(id) !== EntryKind.Folder) {
+            throw new Error("Entry is not a folder");
+        }
+        return this.entry(id) as FolderEntry;
+    }
+
+    private folderFileEntries(id: EntryId): FileEntry[] {
+        const folder = this.tryFolderEntry(id);
         return folder.children
-            .filter((child_id) => this.isFile(child_id))
-            .map((child_id) => this.fileEntry(child_id));
+            .filter((child_id) => this.kind(child_id) == EntryKind.File)
+            .map((child_id) => this.tryFileEntry(child_id));
     }
 
-    private folderSubfolderEntries(id: EntryId): Folder[] {
-        const folder = this.folderEntry(id);
+    private folderSubfolderEntries(id: EntryId): FolderEntry[] {
+        const folder = this.tryFolderEntry(id);
         return folder.children
-            .filter((child_id) => this.isFolder(child_id))
-            .map((child_id) => this.folderEntry(child_id));
+            .filter((child_id) => this.kind(child_id) === EntryKind.Folder)
+            .map((child_id) => this.tryFolderEntry(child_id));
     }
 
-    private folderParentEntry(id: EntryId): Folder | null {
-        const parent_id = this.parent(id);
-        return parent_id ? this.folderEntry(parent_id) : null;
+    private pushSubentry(parent_id: EntryId, id: EntryId): void {
+        const parent_folder = this.tryFolderEntry(parent_id);
+        if (parent_folder) {
+            parent_folder.children.push(id);
+        }
+    }
+
+    private removeSubentry(parent_id: EntryId, id: EntryId): void {
+        const parent_folder = this.tryFolderEntry(parent_id);
+        if (parent_folder) {
+            parent_folder.children = parent_folder.children.filter(
+                (child_id) => child_id !== id,
+            );
+        }
     }
 
     private async save() {
