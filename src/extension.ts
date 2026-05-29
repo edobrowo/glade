@@ -17,14 +17,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
     provider.bindView(tree_view);
 
-    tree_view.onDidExpandElement((event) => {
+    tree_view.onDidExpandElement(async (event) => {
         const element = event.element as FolderTreeItem;
-        model.folderSetCollapsible(element.entryId, Collapsible.Expanded);
+        await model.folderSetCollapsible(element.entryId, Collapsible.Expanded);
     });
 
-    tree_view.onDidCollapseElement((event) => {
+    tree_view.onDidCollapseElement(async (event) => {
         const element = event.element as FolderTreeItem;
-        model.folderSetCollapsible(element.entryId, Collapsible.Collapsed);
+        await model.folderSetCollapsible(element.entryId, Collapsible.Collapsed);
     });
 
     // Icons: https://microsoft.github.io/vscode-codicons/dist/codicon.html
@@ -266,10 +266,10 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
         this.expandFolder(target_folder_id);
     }
 
-    removeEntry(id: EntryId): void {
+    async removeEntry(id: EntryId): Promise<void> {
         const folder_id = this.model.parent(id);
 
-        this.model.remove(id);
+        await this.model.remove(id);
 
         if (!folder_id) {
             this.refresh();
@@ -278,7 +278,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
         const is_empty = this.model.folderIsEmpty(folder_id);
         if (is_empty) {
-            this.model.folderSetCollapsible(folder_id, Collapsible.None);
+            await this.model.folderSetCollapsible(folder_id, Collapsible.None);
         }
 
         this.refresh();
