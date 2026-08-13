@@ -1,7 +1,7 @@
 {
     "name": "glade",
     "displayName": "glade",
-    "description": "A glade of file trees.",
+    "description": "Workspace directory views.",
     "version": "1.0.0",
     "engines": {
         "vscode": "^1.110.0"
