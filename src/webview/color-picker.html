@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<body>
+    <main>
+        <div id="picker"></div>
+        <button id="accept-pick">Accept</button>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@jaames/iro@5"></script>
+    <script>
+        const vscode = acquireVsCodeApi();
+
+        const picker = new iro.ColorPicker("#picker", {
+            layout: [
+                { component: iro.ui.Wheel },
+                {
+                    component: iro.ui.Slider,
+                    options: { sliderType: "saturation" }
+                },
+                {
+                    component: iro.ui.Slider,
+                    options: { sliderType: "value" }
+                },
+            ],
+            width: 240,
+            color: {
+                r: {{RED}},
+                g: {{GREEN}},
+                b: {{BLUE}}
+            }
+        });
+
+        let current_color = picker.color.rgb;
+
+        picker.on("color:change", (color) => {
+            current_color = color.rgb;
+        });
+
+        const button = document.getElementById("accept-pick");
+
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+                vscode.postMessage({
+                    type: "colorSelected",
+                    value: current_color
+                });
+            }
+        });
+
+        button.addEventListener("click", () => {
+            vscode.postMessage({
+                type: "colorSelected",
+                value: current_color
+            });
+        });
+    </script>
+
+    <style>
+        main {
+            display: flex;
+            flex-direction: column;
+            justify-content: left;
+            gap: 20px;
+            padding: 32px;
+        }
+
+        #accept-pick {
+            width: 240px;
+            height: 24px;
+            border: none;
+            border-radius: 4px;
+            background-color: #3B63CE;
+            color: #FFFFFF;
+            font-family: system-ui, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        #accept-pick:hover {
+            background-color: #3D6FE0;
+        }
+    </style>
+</body>
+</html>
