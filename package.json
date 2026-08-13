@@ -1,10 +1,10 @@
 {
     "name": "glade",
     "displayName": "glade",
-    "description": "Glade of file trees.",
+    "description": "A glade of file trees.",
     "version": "1.0.0",
     "engines": {
-        "vscode": "^1.105.0"
+        "vscode": "^1.110.0"
     },
     "publisher": "edobrowo",
     "activationEvents": [],
