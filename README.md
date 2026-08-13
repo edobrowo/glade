@@ -3,5 +3,5 @@ Yeah
 # TODO
 - [ ] Notes.
 - [ ] Improved logo.
-- [ ] Handle file renames.
-- [ ] Handle file deletes.
+- [x] Handle file renames.
+- [x] Handle file deletes.

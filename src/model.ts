@@ -33,7 +33,7 @@ export class BaseEntry {
 }
 
 export class FileEntry extends BaseEntry {
-    readonly uri: vscode.Uri;
+    uri: vscode.Uri;
 
     constructor(id: EntryId, parent_id: EntryId, uri: vscode.Uri) {
         super(EntryKind.File, id, parent_id);
@@ -227,14 +227,45 @@ export class Model {
         await this.save();
     }
 
-    async updateFilesByUri(uri: vscode.Uri): Promise<void> {
-        // TODO:
-        console.log(`Updated ${uri}`);
+    async renameUri(old_uri: vscode.Uri, new_uri: vscode.Uri): Promise<void> {
+        const old_uri_str = old_uri.toString();
+
+        const ids = Object.entries(this.entries)
+            .filter(
+                ([_, entry]) =>
+                    entry.kind === EntryKind.File &&
+                    (entry as FileEntry).uri.toString() === old_uri_str,
+            )
+            .map(([id, _]) => id as EntryId);
+
+        for (const id of ids) {
+            let entry = this.tryFileEntry(id);
+            entry.uri = new_uri;
+        }
+
+        if (ids.length > 0) {
+            await this.save();
+        }
     }
 
     async removeFilesByUri(uri: vscode.Uri): Promise<void> {
-        // TODO:
-        console.log(`Removed ${uri}`);
+        const uri_str = uri.toString();
+
+        const ids = Object.entries(this.entries)
+            .filter(
+                ([_, entry]) =>
+                    entry.kind === EntryKind.File &&
+                    (entry as FileEntry).uri.toString() === uri_str,
+            )
+            .map(([id, _]) => id as EntryId);
+
+        for (const id of ids) {
+            await this.remove(id);
+        }
+
+        if (ids.length > 0) {
+            await this.save();
+        }
     }
 
     async fileCreate(folder_id: EntryId, uri: vscode.Uri): Promise<boolean> {
