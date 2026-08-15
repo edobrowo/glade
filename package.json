@@ -168,7 +168,7 @@
                 {
                     "id": "glade",
                     "title": "glade",
-                    "icon": "resources/glade.svg"
+                    "icon": "images/glade.png"
                 }
             ]
         },
@@ -177,7 +177,7 @@
                 {
                     "id": "gladeTrees",
                     "name": "The Trees",
-                    "icon": "resources/glade.svg"
+                    "icon": "images/glade.png"
                 }
             ]
         }
