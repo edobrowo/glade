@@ -1,21 +1,19 @@
 {
     "compilerOptions": {
-        "module": "commonjs",
-        "target": "ES2024",
-        "lib": [
-            "ES2024",
-            "dom"
-        ],
+        "module": "Node16",
+        "target": "ES2022",
         "outDir": "out",
-        "sourceMap": true,
-        "strict": true,
-        "rootDir": "src",
+        "lib": [
+            "ES2022"
+        ],
         "types": [
-            "node"
-        ]
-    },
-    "exclude": [
-        "node_modules",
-        ".vscode-test"
-    ]
+            "node",
+        ],
+        "sourceMap": true,
+        "rootDir": "src",
+        "strict": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUnusedParameters": true,
+    }
 }

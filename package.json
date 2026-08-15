@@ -2,9 +2,9 @@
     "name": "glade",
     "displayName": "glade",
     "description": "Workspace directory views.",
-    "version": "1.0.0",
+    "version": "0.0.1",
     "engines": {
-        "vscode": "^1.110.0"
+        "vscode": "^1.125.0"
     },
     "publisher": "edobrowo",
     "repository": {
@@ -183,21 +183,28 @@
         }
     },
     "author": "edobrowo",
-    "license": "ISC",
+    "license": "MIT",
     "type": "commonjs",
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
-        "lint": "eslint",
-        "watch": "tsc -watch -p ./"
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src",
+        "test": "vscode-test"
     },
     "devDependencies": {
-        "@eslint/js": "^10.0.1",
-        "@stylistic/eslint-plugin": "^5.10.0",
-        "@types/node": "^25.5.0",
-        "@types/vscode": "^1.110.0",
-        "eslint": "^10.1.0",
-        "typescript": "^6.0.2",
-        "typescript-eslint": "^8.58.0"
+        "@types/vscode": "^1.125.0",
+        "@types/mocha": "^10.0.10",
+        "@types/node": "24.x",
+        "typescript-eslint": "^8.61.1",
+        "eslint": "^10.5.0",
+        "typescript": "^6.0.3",
+        "@vscode/test-cli": "^0.0.15",
+        "@vscode/test-electron": "^3.0.0"
+    },
+    "overrides": {
+        "diff": "^8.0.4",
+        "serialize-javascript": "^7.0.6"
     }
 }
