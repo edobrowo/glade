@@ -106,6 +106,8 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
             });
         } else if (this.model.kind(id) == EntryKind.File) {
             return [];
+        } else {
+            return [];
         }
     }
 

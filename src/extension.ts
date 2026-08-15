@@ -6,7 +6,6 @@ import { FileTreeItem, FolderTreeItem, Provider } from "./provider";
 import { DnDController } from "./dnd";
 
 export function activate(context: vscode.ExtensionContext): void {
-
     let model = loadOrCreateModel(context);
     let provider = setupProvider(context, model);
 
@@ -33,19 +32,22 @@ export function activate(context: vscode.ExtensionContext): void {
     });
 
     // Delete handling.
-    const fs_watcher = vscode.workspace.createFileSystemWatcher('**/*');
+    const fs_watcher = vscode.workspace.createFileSystemWatcher("**/*");
     fs_watcher.onDidDelete(async (uri) => {
         await model.removeFilesByUri(uri);
         provider.refresh();
     });
     context.subscriptions.push(fs_watcher);
 
-    const rename_listener = vscode.workspace.onWillRenameFiles(async event => {
-        for (const file of event.files) {
-            await model.renameUri(file.oldUri, file.newUri);
-        }
-        provider.refresh();
-    });
+    // Rename handling.
+    const rename_listener = vscode.workspace.onWillRenameFiles(
+        async (event) => {
+            for (const file of event.files) {
+                await model.renameUri(file.oldUri, file.newUri);
+            }
+            provider.refresh();
+        },
+    );
     context.subscriptions.push(rename_listener);
 }
 
@@ -55,15 +57,17 @@ function loadOrCreateModel(context: vscode.ExtensionContext): Model {
     return model;
 }
 
-function setupProvider(context: vscode.ExtensionContext, model: Model): Provider {
-
+function setupProvider(
+    context: vscode.ExtensionContext,
+    model: Model,
+): Provider {
     const provider = new Provider(model);
 
     // Icons: https://microsoft.github.io/vscode-codicons/dist/codicon.html
 
     const top_level_track_file = vscode.commands.registerCommand(
         "extension.topLevelTrackFile",
-        async (item: FolderTreeItem) => {
+        async (_item: FolderTreeItem) => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
                 vscode.window.showErrorMessage(

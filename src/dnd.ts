@@ -14,7 +14,7 @@ export class DnDController implements vscode.TreeDragAndDropController<TreeItem>
     async handleDrag(
         source: readonly TreeItem[],
         data_transfer: vscode.DataTransfer,
-        token: vscode.CancellationToken,
+        _token: vscode.CancellationToken,
     ): Promise<void> {
         data_transfer.set(
             "application/vnd.code.tree.glade",
@@ -25,7 +25,7 @@ export class DnDController implements vscode.TreeDragAndDropController<TreeItem>
     async handleDrop(
         target: TreeItem | undefined,
         data_transfer: vscode.DataTransfer,
-        token: vscode.CancellationToken,
+        _token: vscode.CancellationToken,
     ): Promise<void> {
         const target_folder_id = target
             ? this.provider.resolveTargetFolder(target.entryId)
