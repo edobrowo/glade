@@ -2,7 +2,8 @@
     "name": "glade-workspace",
     "displayName": "Glade Workspace",
     "description": "Workspace directory views.",
-    "version": "0.0.1",
+    "icon": "images/glade.png",
+    "version": "0.0.3",
     "engines": {
         "vscode": "^1.125.0"
     },

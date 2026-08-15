@@ -4,9 +4,3 @@ Create "views" into your workspace directory by building a collection of folder 
 ## Features
 
 WIP
-
-## Release Notes
-
-### 0.0.1
-
-The extension.
