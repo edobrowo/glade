@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { Provider, TreeItem } from "./provider";
+import { Provider, WorkspaceItem } from "./provider";
 
-export class DnDController implements vscode.TreeDragAndDropController<TreeItem> {
+export class DnDController implements vscode.TreeDragAndDropController<WorkspaceItem> {
     dropMimeTypes: readonly string[] = [
         "application/vnd.code.tree.glade",
         "text/uri-list",
@@ -12,7 +12,7 @@ export class DnDController implements vscode.TreeDragAndDropController<TreeItem>
     constructor(private provider: Provider) {}
 
     async handleDrag(
-        source: readonly TreeItem[],
+        source: readonly WorkspaceItem[],
         data_transfer: vscode.DataTransfer,
         _token: vscode.CancellationToken,
     ): Promise<void> {
@@ -23,7 +23,7 @@ export class DnDController implements vscode.TreeDragAndDropController<TreeItem>
     }
 
     async handleDrop(
-        target: TreeItem | undefined,
+        target: WorkspaceItem | undefined,
         data_transfer: vscode.DataTransfer,
         _token: vscode.CancellationToken,
     ): Promise<void> {

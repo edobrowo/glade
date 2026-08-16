@@ -4,9 +4,10 @@ import { Collapsible, EntryId, EntryKind, Model } from "./model";
 export enum ItemType {
     File = "gladeFile",
     Folder = "gladeFolder",
+    Label = "gladeLabel",
 }
 
-export class TreeItem extends vscode.TreeItem {
+export class WorkspaceItem extends vscode.TreeItem {
     public readonly entryId: EntryId;
 
     constructor(
@@ -32,7 +33,7 @@ export class TreeItem extends vscode.TreeItem {
     }
 }
 
-export class FileTreeItem extends TreeItem {
+export class FileTreeItem extends WorkspaceItem {
     constructor(entry_id: EntryId, uri: vscode.Uri) {
         super(entry_id, uri);
 
@@ -49,7 +50,7 @@ export class FileTreeItem extends TreeItem {
     }
 }
 
-export class FolderTreeItem extends TreeItem {
+export class FolderTreeItem extends WorkspaceItem {
     constructor(
         entry_id: EntryId,
         name: string,
@@ -60,6 +61,7 @@ export class FolderTreeItem extends TreeItem {
 
         this.contextValue = ItemType.Folder;
         this.iconPath = icon_path;
+        console.log(icon_path);
     }
 
     name(): string {
@@ -69,34 +71,59 @@ export class FolderTreeItem extends TreeItem {
     }
 }
 
-// TreeView API: https://code.visualstudio.com/api/extension-guides/tree-view
-export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
-    private _onDidChangeTreeData: vscode.EventEmitter<FolderTreeItem | null> =
-        new vscode.EventEmitter<FolderTreeItem | null>();
-    readonly onDidChangeTreeData: vscode.Event<FolderTreeItem | null> =
+export class LabelItem extends vscode.TreeItem {
+    constructor(label: string, icon_path: vscode.Uri) {
+        super(label, vscode.TreeItemCollapsibleState.None);
+
+        this.id = crypto.randomUUID();
+        this.contextValue = ItemType.Label;
+        this.iconPath = icon_path;
+    }
+}
+
+export type ProviderItem = WorkspaceItem | LabelItem;
+
+export class Provider implements vscode.TreeDataProvider<ProviderItem> {
+    private _onDidChangeTreeData: vscode.EventEmitter<ProviderItem | null> =
+        new vscode.EventEmitter<ProviderItem | null>();
+    readonly onDidChangeTreeData: vscode.Event<ProviderItem | null> =
         this._onDidChangeTreeData.event;
 
     private model: Model;
     private treeView?: vscode.TreeView<vscode.TreeItem>;
 
-    constructor(model: Model) {
+    constructor(model: Model, private context: vscode.ExtensionContext) {
         this.model = model;
     }
 
-    getTreeItem(element: TreeItem): TreeItem {
+    getTreeItem(element: ProviderItem): ProviderItem {
         return element;
     }
 
-    bindView(tree_view: vscode.TreeView<vscode.TreeItem>): void {
+    bindView(tree_view: vscode.TreeView<ProviderItem>): void {
         this.treeView = tree_view;
     }
 
     getChildren(
         element?: FolderTreeItem,
-    ): vscode.ProviderResult<vscode.TreeItem[]> {
+    ): vscode.ProviderResult<ProviderItem[]> {
         const id = !element ? this.model.root() : element.entryId;
+
         if (this.model.kind(id) == EntryKind.Folder) {
             const children = this.model.folderChildren(id);
+
+            // If the root has no model entries, display a placeholder.
+            // This also solves a bug where drag and drop cannot find
+            // a target when the tree view is empty.
+            if (!element && children.length === 0) {
+                const icon_path = vscode.Uri.joinPath(
+                    this.context.extensionUri,
+                    "images",
+                    "glade.png",
+                );
+                return [new LabelItem("Empty glade.", icon_path)];
+            }
+
             return children.map((child) => {
                 if (this.model.kind(child) == EntryKind.Folder) {
                     return this.createFolderItem(child);
@@ -104,14 +131,16 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
                     return this.createFileItem(child);
                 }
             });
-        } else if (this.model.kind(id) == EntryKind.File) {
-            return [];
-        } else {
-            return [];
         }
+
+        return [];
     }
 
-    getParent(element: TreeItem): vscode.ProviderResult<FolderTreeItem> {
+    getParent(element: ProviderItem): vscode.ProviderResult<FolderTreeItem> {
+        if (element instanceof LabelItem) {
+            return null;
+        }
+
         const parent_id = this.model.parent(element.entryId);
 
         // The root is not an element, so all top-level elements must return

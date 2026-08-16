@@ -61,9 +61,7 @@ function setupProvider(
     context: vscode.ExtensionContext,
     model: Model,
 ): Provider {
-    const provider = new Provider(model);
-
-    // Icons: https://microsoft.github.io/vscode-codicons/dist/codicon.html
+    const provider = new Provider(model, context);
 
     const top_level_track_file = vscode.commands.registerCommand(
         "extension.topLevelTrackFile",
