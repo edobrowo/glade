@@ -177,7 +177,7 @@
             "glade": [
                 {
                     "id": "gladeTrees",
-                    "name": "The Trees",
+                    "name": "Workspace",
                     "icon": "images/glade.png"
                 }
             ]
