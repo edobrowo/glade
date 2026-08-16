@@ -269,6 +269,7 @@ export class Provider implements vscode.TreeDataProvider<vscode.TreeItem> {
 
     private async expandFolder(folder_id: EntryId): Promise<void> {
         if (!this.treeView) return;
+        if (folder_id == this.rootFolder()) return;
 
         const folder_item = this.createFolderItem(folder_id);
         try {
