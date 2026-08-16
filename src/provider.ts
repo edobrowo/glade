@@ -61,7 +61,6 @@ export class FolderTreeItem extends WorkspaceItem {
 
         this.contextValue = ItemType.Folder;
         this.iconPath = icon_path;
-        console.log(icon_path);
     }
 
     name(): string {
@@ -92,7 +91,10 @@ export class Provider implements vscode.TreeDataProvider<ProviderItem> {
     private model: Model;
     private treeView?: vscode.TreeView<vscode.TreeItem>;
 
-    constructor(model: Model, private context: vscode.ExtensionContext) {
+    constructor(
+        model: Model,
+        private context: vscode.ExtensionContext,
+    ) {
         this.model = model;
     }
 
