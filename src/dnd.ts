@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { Provider, WorkspaceItem } from "./provider";
+import { LabelItem, Provider, ProviderItem, WorkspaceItem } from "./provider";
 
-export class DnDController implements vscode.TreeDragAndDropController<WorkspaceItem> {
+export class DnDController implements vscode.TreeDragAndDropController<ProviderItem> {
     dropMimeTypes: readonly string[] = [
         "application/vnd.code.tree.glade",
         "text/uri-list",
@@ -12,21 +12,29 @@ export class DnDController implements vscode.TreeDragAndDropController<Workspace
     constructor(private provider: Provider) {}
 
     async handleDrag(
-        source: readonly WorkspaceItem[],
+        source: readonly ProviderItem[],
         data_transfer: vscode.DataTransfer,
         _token: vscode.CancellationToken,
     ): Promise<void> {
+        const draggable = source.filter(
+            (item): item is WorkspaceItem => item instanceof WorkspaceItem,
+        );
+
         data_transfer.set(
             "application/vnd.code.tree.glade",
-            new vscode.DataTransferItem(source.map((item) => item.entryId)),
+            new vscode.DataTransferItem(
+                draggable.map((item) => (item as WorkspaceItem).entryId),
+            ),
         );
     }
 
     async handleDrop(
-        target: WorkspaceItem | undefined,
+        target: ProviderItem | undefined,
         data_transfer: vscode.DataTransfer,
         _token: vscode.CancellationToken,
     ): Promise<void> {
+        if (target instanceof LabelItem) return;
+
         const target_folder_id = target
             ? this.provider.resolveTargetFolder(target.entryId)
             : this.provider.rootFolder();
