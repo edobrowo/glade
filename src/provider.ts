@@ -225,6 +225,8 @@ export class Provider implements vscode.TreeDataProvider<ProviderItem> {
     }
 
     async removeEntry(id: EntryId): Promise<void> {
+        if (!this.model.exists(id)) return;
+
         const folder_id = this.model.parent(id);
 
         await this.model.remove(id);

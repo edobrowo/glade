@@ -128,6 +128,10 @@ export class Model {
         return this.rootId;
     }
 
+    exists(id: EntryId): boolean {
+        return this.entry(id) !== undefined;
+    }
+
     kind(id: EntryId): EntryKind {
         return this.entry(id).kind;
     }
