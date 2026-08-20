@@ -3,7 +3,7 @@
     "displayName": "Glade Workspace",
     "description": "Workspace directory views.",
     "icon": "images/glade.png",
-    "version": "0.0.3",
+    "version": "0.0.4",
     "engines": {
         "vscode": "^1.125.0"
     },
