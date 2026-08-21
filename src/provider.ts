@@ -194,6 +194,9 @@ export class Provider implements vscode.TreeDataProvider<ProviderItem> {
     }
 
     async moveEntry(id: EntryId, target_folder_id: EntryId): Promise<void> {
+        if (id == target_folder_id)
+            return;
+
         const old_parent_id = this.model.parent(id);
 
         const result = await this.model.move(id, target_folder_id);
