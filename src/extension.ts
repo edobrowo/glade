@@ -5,7 +5,7 @@ import { Collapsible, EntryKind, Model } from "./model";
 import { FileTreeItem, FolderTreeItem, Provider } from "./provider";
 import { DnDController } from "./dnd";
 
-export function activate(context: vscode.ExtensionContext): void {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
     let model = loadOrCreateModel(context);
     let provider = setupProvider(context, model);
 
@@ -64,7 +64,7 @@ function setupProvider(
     const provider = new Provider(model, context);
 
     const top_level_track_file = vscode.commands.registerCommand(
-        "extension.topLevelTrackFile",
+        "gladeWorkspace.topLevelTrackFile",
         async (_item: FolderTreeItem) => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
@@ -82,7 +82,7 @@ function setupProvider(
     context.subscriptions.push(top_level_track_file);
 
     const top_level_create_folder = vscode.commands.registerCommand(
-        "extension.topLevelCreateFolder",
+        "gladeWorkspace.topLevelCreateFolder",
         async () => {
             const name = await vscode.window.showInputBox({
                 prompt: "Folder Name",
@@ -97,7 +97,7 @@ function setupProvider(
     context.subscriptions.push(top_level_create_folder);
 
     const top_level_collapse_all = vscode.commands.registerCommand(
-        "extension.topLevelCollapseAll",
+        "gladeWorkspace.topLevelCollapseAll",
         async () => {
             const root_id = provider.rootFolder();
             await provider.collapseAll(root_id);
@@ -106,7 +106,7 @@ function setupProvider(
     context.subscriptions.push(top_level_collapse_all);
 
     const create_folder = vscode.commands.registerCommand(
-        "extension.createFolder",
+        "gladeWorkspace.createFolder",
         async (item: FolderTreeItem) => {
             const name = await vscode.window.showInputBox({
                 prompt: "Folder Name",
@@ -120,7 +120,7 @@ function setupProvider(
     context.subscriptions.push(create_folder);
 
     const remove_folder = vscode.commands.registerCommand(
-        "extension.removeFolder",
+        "gladeWorkspace.removeFolder",
         async (item: FolderTreeItem) => {
             const folder_id = item.entryId;
             await provider.removeEntry(folder_id);
@@ -129,7 +129,7 @@ function setupProvider(
     context.subscriptions.push(remove_folder);
 
     const edit_folder_name = vscode.commands.registerCommand(
-        "extension.editFolderName",
+        "gladeWorkspace.editFolderName",
         async (item: FolderTreeItem) => {
             const name = await vscode.window.showInputBox({
                 prompt: "Edit",
@@ -143,7 +143,7 @@ function setupProvider(
     context.subscriptions.push(edit_folder_name);
 
     const edit_folder_color = vscode.commands.registerCommand(
-        "extension.pickFolderColor",
+        "gladeWorkspace.pickFolderColor",
         (item: FolderTreeItem) => {
             openColorPicker(context, provider, item);
         },
@@ -151,7 +151,7 @@ function setupProvider(
     context.subscriptions.push(edit_folder_color);
 
     const open_all = vscode.commands.registerCommand(
-        "extension.openAll",
+        "gladeWorkspace.openAll",
         async (item: FolderTreeItem) => {
             const descendents = model.descendents(item.entryId);
             const file_ids = descendents.filter(
@@ -177,7 +177,7 @@ function setupProvider(
     context.subscriptions.push(open_all);
 
     const track_file = vscode.commands.registerCommand(
-        "extension.trackFile",
+        "gladeWorkspace.trackFile",
         async (item: FolderTreeItem) => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) {
@@ -195,7 +195,7 @@ function setupProvider(
     context.subscriptions.push(track_file);
 
     const untrack_file = vscode.commands.registerCommand(
-        "extension.untrackFile",
+        "gladeWorkspace.untrackFile",
         async (item: FileTreeItem) => await provider.removeEntry(item.entryId),
     );
     context.subscriptions.push(untrack_file);

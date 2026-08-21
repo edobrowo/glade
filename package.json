@@ -4,65 +4,67 @@
     "description": "Workspace directory views.",
     "icon": "images/glade.png",
     "version": "0.0.4",
-    "engines": {
-        "vscode": "^1.125.0"
-    },
+    "author": "edobrowo",
     "publisher": "edobrowo",
     "repository": {
         "type": "git",
         "url": "https://github.com/edobrowo/glade"
     },
-    "activationEvents": [],
+    "license": "MIT",
+    "type": "commonjs",
     "main": "./out/extension.js",
+    "engines": {
+        "vscode": "^1.125.0"
+    },
     "contributes": {
         "commands": [
             {
-                "command": "extension.topLevelTrackFile",
+                "command": "gladeWorkspace.topLevelTrackFile",
                 "title": "Track File In Top Level",
                 "icon": "$(new-file)"
             },
             {
-                "command": "extension.topLevelCreateFolder",
+                "command": "gladeWorkspace.topLevelCreateFolder",
                 "title": "Create Folder",
                 "icon": "$(new-folder)"
             },
             {
-                "command": "extension.topLevelCollapseAll",
+                "command": "gladeWorkspace.topLevelCollapseAll",
                 "title": "Collapse All",
                 "icon": "$(collapse-all)"
             },
             {
-                "command": "extension.createFolder",
+                "command": "gladeWorkspace.createFolder",
                 "title": "Create Folder",
                 "icon": "$(new-folder)"
             },
             {
-                "command": "extension.editFolderName",
+                "command": "gladeWorkspace.editFolderName",
                 "title": "Edit Folder Name",
                 "icon": "$(rename)"
             },
             {
-                "command": "extension.pickFolderColor",
+                "command": "gladeWorkspace.pickFolderColor",
                 "title": "Pick Folder Color",
                 "icon": "$(symbol-color)"
             },
             {
-                "command": "extension.removeFolder",
+                "command": "gladeWorkspace.removeFolder",
                 "title": "Remove Folder",
                 "icon": "$(trash)"
             },
             {
-                "command": "extension.trackFile",
+                "command": "gladeWorkspace.trackFile",
                 "title": "Track File",
                 "icon": "$(new-file)"
             },
             {
-                "command": "extension.untrackFile",
+                "command": "gladeWorkspace.untrackFile",
                 "title": "Untrack File",
                 "icon": "$(remove)"
             },
             {
-                "command": "extension.openAll",
+                "command": "gladeWorkspace.openAll",
                 "title": "Open All",
                 "icon": "$(open-in-window)"
             }
@@ -70,115 +72,115 @@
         "menus": {
             "view/title": [
                 {
-                    "command": "extension.topLevelTrackFile",
+                    "command": "gladeWorkspace.topLevelTrackFile",
                     "when": "view == gladeTrees",
                     "group": "navigation@1"
                 },
                 {
-                    "command": "extension.topLevelCreateFolder",
+                    "command": "gladeWorkspace.topLevelCreateFolder",
                     "when": "view == gladeTrees",
                     "group": "navigation@2"
                 },
                 {
-                    "command": "extension.topLevelCollapseAll",
+                    "command": "gladeWorkspace.topLevelCollapseAll",
                     "when": "view == gladeTrees",
                     "group": "navigation@3"
                 }
             ],
             "view/item/context": [
                 {
-                    "command": "extension.untrackFile",
+                    "command": "gladeWorkspace.untrackFile",
                     "when": "view == gladeTrees && viewItem == gladeFile",
                     "group": "inline"
                 },
                 {
-                    "command": "extension.untrackFile",
+                    "command": "gladeWorkspace.untrackFile",
                     "when": "view == gladeTrees && viewItem == gladeFile",
                     "group": "1_manage"
                 },
                 {
-                    "command": "extension.trackFile",
+                    "command": "gladeWorkspace.trackFile",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "inline@1"
                 },
                 {
-                    "command": "extension.createFolder",
+                    "command": "gladeWorkspace.createFolder",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "inline@2"
                 },
                 {
-                    "command": "extension.editFolderName",
+                    "command": "gladeWorkspace.editFolderName",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "inline@3"
                 },
                 {
-                    "command": "extension.pickFolderColor",
+                    "command": "gladeWorkspace.pickFolderColor",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "inline@4"
                 },
                 {
-                    "command": "extension.openAll",
+                    "command": "gladeWorkspace.openAll",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "inline@5"
                 },
                 {
-                    "command": "extension.editFolderName",
+                    "command": "gladeWorkspace.editFolderName",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "0_edit@1"
                 },
                 {
-                    "command": "extension.pickFolderColor",
+                    "command": "gladeWorkspace.pickFolderColor",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "0_edit@2"
                 },
                 {
-                    "command": "extension.openAll",
+                    "command": "gladeWorkspace.openAll",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "0_edit@3"
                 },
                 {
-                    "command": "extension.trackFile",
+                    "command": "gladeWorkspace.trackFile",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "1_manage@1"
                 },
                 {
-                    "command": "extension.createFolder",
+                    "command": "gladeWorkspace.createFolder",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "1_manage@2"
                 },
                 {
-                    "command": "extension.removeFolder",
+                    "command": "gladeWorkspace.removeFolder",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "1_manage@3"
                 }
             ],
             "commandPalette": [
                 {
-                    "command": "extension.createFolder",
+                    "command": "gladeWorkspace.createFolder",
                     "when": "false"
                 },
                 {
-                    "command": "extension.editFolderName",
+                    "command": "gladeWorkspace.editFolderName",
                     "when": "false"
                 },
                 {
-                    "command": "extension.pickFolderColor",
+                    "command": "gladeWorkspace.pickFolderColor",
                     "when": "false"
                 },
                 {
-                    "command": "extension.openAll",
+                    "command": "gladeWorkspace.openAll",
                     "when": "false"
                 },
                 {
-                    "command": "extension.removeFolder",
+                    "command": "gladeWorkspace.removeFolder",
                     "when": "false"
                 },
                 {
-                    "command": "extension.topLevelTrackFile",
+                    "command": "gladeWorkspace.topLevelTrackFile",
                     "when": "true"
                 },
                 {
-                    "command": "extension.trackFile",
+                    "command": "gladeWorkspace.trackFile",
                     "when": "false"
                 }
             ]
@@ -202,9 +204,6 @@
             ]
         }
     },
-    "author": "edobrowo",
-    "license": "MIT",
-    "type": "commonjs",
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
