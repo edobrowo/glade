@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { Collapsible, Model } from "./model";
+import { Collapsible, EntryKind, Model } from "./model";
 import { FileTreeItem, FolderTreeItem, Provider } from "./provider";
 import { DnDController } from "./dnd";
 
@@ -149,6 +149,32 @@ function setupProvider(
         },
     );
     context.subscriptions.push(edit_folder_color);
+
+    const open_all = vscode.commands.registerCommand(
+        "extension.openAll",
+        async (item: FolderTreeItem) => {
+            const descendents = model.descendents(item.entryId);
+            const file_ids = descendents.filter(
+                (entry) => model.kind(entry) == EntryKind.File,
+            );
+            const uris = file_ids.map((file_id) => model.fileUri(file_id));
+            try {
+                for (const uri of uris) {
+                    const document =
+                        await vscode.workspace.openTextDocument(uri);
+                    await vscode.window.showTextDocument(document, {
+                        preview: false,
+                        viewColumn: vscode.ViewColumn.Active,
+                    });
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to open editor: ${error}`,
+                );
+            }
+        },
+    );
+    context.subscriptions.push(open_all);
 
     const track_file = vscode.commands.registerCommand(
         "extension.trackFile",

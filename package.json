@@ -60,6 +60,11 @@
                 "command": "extension.untrackFile",
                 "title": "Untrack File",
                 "icon": "$(remove)"
+            },
+            {
+                "command": "extension.openAll",
+                "title": "Open All",
+                "icon": "$(open-in-window)"
             }
         ],
         "menus": {
@@ -112,6 +117,11 @@
                     "group": "inline@4"
                 },
                 {
+                    "command": "extension.openAll",
+                    "when": "view == gladeTrees && viewItem == gladeFolder",
+                    "group": "inline@5"
+                },
+                {
                     "command": "extension.editFolderName",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "0_edit@1"
@@ -120,6 +130,11 @@
                     "command": "extension.pickFolderColor",
                     "when": "view == gladeTrees && viewItem == gladeFolder",
                     "group": "0_edit@2"
+                },
+                {
+                    "command": "extension.openAll",
+                    "when": "view == gladeTrees && viewItem == gladeFolder",
+                    "group": "0_edit@3"
                 },
                 {
                     "command": "extension.trackFile",
@@ -148,6 +163,10 @@
                 },
                 {
                     "command": "extension.pickFolderColor",
+                    "when": "false"
+                },
+                {
+                    "command": "extension.openAll",
                     "when": "false"
                 },
                 {
